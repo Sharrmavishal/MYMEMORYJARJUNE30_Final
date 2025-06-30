@@ -320,6 +320,64 @@ const generateStory = async () => {
   }
 }
 
+// Generate audio narration with ElevenLabs
+const generateAudioNarration = async (text, apiKey) => {
+  try {
+    // Use a warm, storytelling voice
+    const voiceId = 'EXAVITQu4vr4xnSDxMaL' // Sarah - warm female voice
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: {
+          stability: 0.75,
+          similarity_boost: 0.85,
+          style: 0.5,
+          use_speaker_boost: true
+        }
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`ElevenLabs API error: ${response.status}`)
+    }
+    
+    // Get audio blob
+    const audioBlob = await response.blob()
+    
+    // Upload to Supabase Storage
+    const fileName = `stories/${user.id}/${Date.now()}.mp3`
+    const { data, error } = await supabase.storage
+      .from('audio-recordings')
+      .upload(fileName, audioBlob, {
+        contentType: 'audio/mpeg'
+      })
+    
+    if (error) {
+      console.error('Audio upload error:', error)
+      return null
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('audio-recordings')
+      .getPublicUrl(fileName)
+    
+    console.log('Audio narration generated successfully')
+    return publicUrl
+    
+  } catch (error) {
+    console.error('Audio narration error:', error)
+    return null // Return null if narration fails, story will still be saved
+  }
+}
+  
   // Family member management
   const addFamilyMember = async (e) => {
     e.preventDefault()
