@@ -127,26 +127,62 @@ function App() {
       setIsRecording(false)
     }
   }
-
-  // Transcription (mock implementation)
-  const transcribeAudio = async () => {
-    if (!audioBlob) return
+// Transcription with real OpenAI Whisper API
+const transcribeAudio = async () => {
+  if (!audioBlob) return
+  
+  setIsTranscribing(true)
+  
+  try {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY
     
-    setIsTranscribing(true)
-    
-    // Mock transcription - in real app, you'd send to speech-to-text service
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    const mockTranscripts = {
-      happy: "Today was such a wonderful day! I spent time with my family at the park, and we had the most amazing picnic. The kids were laughing and playing, and I felt so grateful for these precious moments together.",
-      sad: "I've been thinking about grandma a lot today. She used to tell the most beautiful stories about her childhood. I miss her voice and her warm hugs. These memories are so precious to me.",
-      grateful: "I'm so thankful for all the love in my life. My family, my friends, even the small moments like morning coffee and sunset walks. Every day brings something to be grateful for.",
-      excited: "I can't contain my excitement! We're planning a family reunion next month, and everyone will be there. It's been years since we've all been together. I can already imagine all the stories we'll share!"
+    if (!apiKey) {
+      console.error('OpenAI API key not found')
+      // Fallback to mock for demo if no API key
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      const mockTranscripts = {
+        happy: "Today was such a wonderful day! I spent time with my family at the park, and we had the most amazing picnic. The kids were laughing and playing, and I felt so grateful for these precious moments together.",
+        sad: "I've been thinking about grandma a lot today. She used to tell the most beautiful stories about her childhood. I miss her voice and her warm hugs. These memories are so precious to me.",
+        grateful: "I'm so thankful for all the love in my life. My family, my friends, even the small moments like morning coffee and sunset walks. Every day brings something to be grateful for.",
+        excited: "I can't contain my excitement! We're planning a family reunion next month, and everyone will be there. It's been years since we've all been together. I can already imagine all the stories we'll share!"
+      }
+      setTranscript(mockTranscripts[selectedEmotion] || "This is a sample transcription of your recorded memory.")
+      setIsTranscribing(false)
+      return
     }
     
-    setTranscript(mockTranscripts[selectedEmotion] || "This is a sample transcription of your recorded memory.")
+    // Create form data for OpenAI
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'audio.webm')
+    formData.append('model', 'whisper-1')
+    formData.append('language', 'en')
+    
+    // Call OpenAI Whisper API
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('Transcription successful:', data.text)
+    
+    // Set the real transcription
+    setTranscript(data.text)
+    
+  } catch (error) {
+    console.error('Transcription error:', error)
+    alert('Transcription failed. Please try again.')
+  } finally {
     setIsTranscribing(false)
   }
+}
 
   // Save memory to database
   const saveMemory = async () => {
