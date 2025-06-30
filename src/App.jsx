@@ -405,7 +405,7 @@ if (savedStory.audio_url) {
             .select()
             .single()
           
-          alert(`Story saved and verified on blockchain! Tx: ${blockchainTx}`)
+          alert(`🎉 AI Audio Story created successfully!\n\n🎧 Listen to your narrated story below\n🔗 Blockchain verified: ${blockchainTx}`)
         } catch (error) {
           console.log('Blockchain verification skipped:', error)
         }
@@ -1032,59 +1032,59 @@ const generateAudioNarration = async (text, apiKey) => {
         </div>
 
       {/* ADD NAVIGATION BAR HERE - THIS IS THE NEW CODE */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: '20px', 
-        marginBottom: '20px' 
-      }}>
-        <button
-          onClick={() => setCurrentScreen('memories')}
-          style={{
-            padding: '10px 20px',
-            background: 'white',
-            color: '#667eea',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}
-        >
-          🎙️ Memories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('stories')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          📖 Stories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('family')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          👨‍👩‍👧‍👦 Family
-        </button>
-      </div>
-      {/* END OF NEW NAVIGATION BAR CODE */}
+<div style={{ 
+  display: 'flex', 
+  justifyContent: 'center', 
+  gap: '20px', 
+  marginBottom: '20px' 
+}}>
+  <button
+    onClick={() => setCurrentScreen('memories')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'
+    }}
+  >
+    🎙️ Memories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('stories')}
+    style={{
+      padding: '10px 20px',
+      background: 'white',
+      color: '#667eea',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold'
+    }}
+  >
+    📖 Stories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('family')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'
+    }}
+  >
+    👨‍👩‍👧‍👦 Family
+  </button>
+</div>
+{/* END OF NEW NAVIGATION BAR CODE */}
         
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           {/* Recording Interface */}
@@ -1936,59 +1936,59 @@ const generateAudioNarration = async (text, apiKey) => {
 
         
       {/* ADD NAVIGATION BAR HERE - THIS IS THE NEW CODE */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: '20px', 
-        marginBottom: '20px' 
-      }}>
-        <button
-          onClick={() => setCurrentScreen('memories')}
-          style={{
-            padding: '10px 20px',
-            background: 'white',
-            color: '#667eea',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}
-        >
-          🎙️ Memories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('stories')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          📖 Stories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('family')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          👨‍👩‍👧‍👦 Family
-        </button>
-      </div>
-      {/* END OF NEW NAVIGATION BAR CODE */}
+<div style={{ 
+  display: 'flex', 
+  justifyContent: 'center', 
+  gap: '20px', 
+  marginBottom: '20px' 
+}}>
+  <button
+    onClick={() => setCurrentScreen('memories')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'
+    }}
+  >
+    🎙️ Memories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('stories')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'
+    }}
+  >
+    📖 Stories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('family')}
+    style={{
+      padding: '10px 20px',
+      background: 'white',
+      color: '#667eea',
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold'
+    }}
+  >
+    👨‍👩‍👧‍👦 Family
+  </button>
+</div>
+{/* END OF NEW NAVIGATION BAR CODE */}
 
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           {/* Add Family Member */}
