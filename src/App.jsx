@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase, authService, memoryService, storyService, familyService } from './lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+// Add Supabase initialization for audio uploads
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tzfvteccfyxfefwhmara.supabase.co'
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6ZnZ0ZWNjZnl4ZmVmd2htYXJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEyNjUxMjUsImV4cCI6MjA2Njg0MTEyNX0.2V5VDPPGTxo4R-_s-e7eBUEc7MF8N0s-9zdsZpCNFgY'
+const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
 function App() {
   // Authentication state
@@ -351,9 +357,9 @@ const generateAudioNarration = async (text, apiKey) => {
     // Get audio blob
     const audioBlob = await response.blob()
     
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (using supabaseClient instead of supabase)
     const fileName = `stories/${user.id}/${Date.now()}.mp3`
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseClient.storage
       .from('audio-recordings')
       .upload(fileName, audioBlob, {
         contentType: 'audio/mpeg'
@@ -365,7 +371,7 @@ const generateAudioNarration = async (text, apiKey) => {
     }
     
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = supabaseClient.storage
       .from('audio-recordings')
       .getPublicUrl(fileName)
     
@@ -1492,7 +1498,32 @@ const generateAudioNarration = async (text, apiKey) => {
                     <p style={{ color: '#333', lineHeight: '1.6', marginBottom: '15px' }}>
                       {story.story_text}
                     </p>
-                    <div style={{ fontSize: '12px', color: '#666' }}>
+                    
+                    {/* Audio Player for Narration */}
+                    {story.audio_url && (
+                      <div style={{ 
+                        marginTop: '20px', 
+                        padding: '15px', 
+                        backgroundColor: '#f0f8ff',
+                        borderRadius: '10px',
+                        border: '1px solid #2196F3'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '20px' }}>🎧</span>
+                          <strong style={{ color: '#2196F3' }}>Listen to Audio Narration</strong>
+                        </div>
+                        <audio 
+                          controls 
+                          style={{ width: '100%' }}
+                          preload="metadata"
+                        >
+                          <source src={story.audio_url} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
+                    
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
                       <strong>Based on {story.memory_ids.length} memories</strong>
                     </div>
                   </div>
@@ -1621,316 +1652,310 @@ const generateAudioNarration = async (text, apiKey) => {
                 type="submit"
                 style={{
                   padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  border: 'none',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',color: 'white',
+border: 'none',
+borderRadius: '10px',
+cursor: 'pointer',
+fontSize: '14px',
+fontWeight: 'bold'
+}}
+>
+Invite
+</button>
+</form>
+</div>
+      {/* Family Members List */}
+      <div style={{
+        background: 'white',
+        borderRadius: '20px',
+        padding: '30px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ marginBottom: '20px', color: '#333' }}>Family Members</h2>
+        {familyMembers.length === 0 ? (
+          <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+            No family members added yet. Invite your first family member above!
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gap: '15px' }}>
+            {familyMembers.map((member) => (
+              <div
+                key={member.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '20px',
+                  border: '1px solid #e1e5e9',
                   borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
+                  background: '#f8f9fa'
                 }}
               >
-                Invite
-              </button>
-            </form>
-          </div>
-
-          {/* Family Members List */}
-          <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '30px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-          }}>
-            <h2 style={{ marginBottom: '20px', color: '#333' }}>Family Members</h2>
-            {familyMembers.length === 0 ? (
-              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
-                No family members added yet. Invite your first family member above!
-              </p>
-            ) : (
-              <div style={{ display: 'grid', gap: '15px' }}>
-                {familyMembers.map((member) => (
-                  <div
-                    key={member.id}
+                <div>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>
+                    {member.member_email}
+                  </p>
+                  <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
+                    Added {new Date(member.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <select
+                    value={member.access_level}
+                    onChange={(e) => updateMemberAccess(member.id, e.target.value)}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '20px',
+                      padding: '8px 12px',
                       border: '1px solid #e1e5e9',
-                      borderRadius: '10px',
-                      background: '#f8f9fa'
+                      borderRadius: '5px',
+                      fontSize: '12px',
+                      background: 'white'
                     }}
                   >
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>
-                        {member.member_email}
-                      </p>
-                      <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
-                        Added {new Date(member.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <select
-                        value={member.access_level}
-                        onChange={(e) => updateMemberAccess(member.id, e.target.value)}
-                        style={{
-                          padding: '8px 12px',
-                          border: '1px solid #e1e5e9',
-                          borderRadius: '5px',
-                          fontSize: '12px',
-                          background: 'white'
-                        }}
-                      >
-                        <option value="all">All Memories</option>
-                        <option value="selected">Selected Only</option>
-                        <option value="none">No Access</option>
-                      </select>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '10px',
-                        fontSize: '10px',
-                        fontWeight: 'bold',
-                        background: member.access_level === 'all' ? '#27ae60' : 
-                                   member.access_level === 'selected' ? '#f39c12' : '#e74c3c',
-                        color: 'white'
-                      }}>
-                        {member.access_level.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                    <option value="all">All Memories</option>
+                    <option value="selected">Selected Only</option>
+                    <option value="none">No Access</option>
+                  </select>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: '10px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    background: member.access_level === 'all' ? '#27ae60' : 
+                               member.access_level === 'selected' ? '#f39c12' : '#e74c3c',
+                    color: 'white'
+                  }}>
+                    {member.access_level.toUpperCase()}
+                  </span>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-        
-        {/* Bolt.new Badge - MANDATORY for Hackathon */}
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 1000,
-          backgroundColor: '#000',
-          padding: '10px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}>
-          <a 
-            href="https://bolt.new" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{
-              color: '#fff',
-              textDecoration: 'none',
-              fontSize: '14px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            Built with ⚡ Bolt.new
-          </a>
-        </div>
+        )}
       </div>
-    )
-  }
-
-  // Pricing screen
-  if (currentScreen === 'pricing') {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '20px'
-      }}>
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+    </div>
+    
+    {/* Bolt.new Badge - MANDATORY for Hackathon */}
+    <div style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      zIndex: 1000,
+      backgroundColor: '#000',
+      padding: '10px 20px',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+    }}>
+      <a 
+        href="https://bolt.new" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style={{
+          color: '#fff',
+          textDecoration: 'none',
+          fontSize: '14px',
+          fontWeight: '600',
+          display: 'flex',
           alignItems: 'center',
-          marginBottom: '30px'
+          gap: '8px'
+        }}
+      >
+        Built with ⚡ Bolt.new
+      </a>
+    </div>
+  </div>
+)
+}
+// Pricing screen
+if (currentScreen === 'pricing') {
+return (
+<div style={{
+minHeight: '100vh',
+background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+padding: '20px'
+}}>
+{/* Header */}
+<div style={{
+display: 'flex',
+justifyContent: 'space-between',
+alignItems: 'center',
+marginBottom: '30px'
+}}>
+<button
+onClick={() => setCurrentScreen('welcome')}
+style={{
+background: 'rgba(255,255,255,0.2)',
+color: 'white',
+border: 'none',
+padding: '10px 20px',
+borderRadius: '20px',
+cursor: 'pointer',
+fontSize: '14px'
+}}
+>
+← Back
+</button>
+<h1 style={{
+color: 'white',
+fontSize: '24px',
+fontWeight: 'bold',
+margin: 0
+}}>
+Pricing Plans
+</h1>
+<button
+onClick={handleSignOut}
+style={{
+background: 'rgba(255,255,255,0.2)',
+color: 'white',
+border: 'none',
+padding: '10px 20px',
+borderRadius: '20px',
+cursor: 'pointer',
+fontSize: '14px'
+}}
+>
+Sign Out
+</button>
+</div>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '20px',
+        padding: '30px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+      }}>
+        <h2>Pricing Plans</h2>
+        <p style={{ color: '#666', marginBottom: '40px', textAlign: 'center' }}>
+          Choose the perfect plan for your family's memory preservation needs
+        </p>
+
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '30px',
+          maxWidth: '900px',
+          margin: '0 auto'
         }}>
-          <button
-            onClick={() => setCurrentScreen('welcome')}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            ← Back
-          </button>
-          <h1 style={{ 
-            color: 'white', 
-            fontSize: '24px', 
-            fontWeight: 'bold',
-            margin: 0
+          {/* Free Plan */}
+          <div style={{ 
+            backgroundColor: 'white',
+            padding: '40px 30px',
+            borderRadius: '16px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center',
+            border: '2px solid #f0f0f0'
           }}>
-            Pricing Plans
-          </h1>
-          <button
-            onClick={handleSignOut}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '30px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-          }}>
-            <h2>Pricing Plans</h2>
-            <p style={{ color: '#666', marginBottom: '40px', textAlign: 'center' }}>
-              Choose the perfect plan for your family's memory preservation needs
-            </p>
-
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '30px',
-              maxWidth: '900px',
-              margin: '0 auto'
-            }}>
-              {/* Free Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                textAlign: 'center',
-                border: '2px solid #f0f0f0'
-              }}>
-                <h3 style={{ color: '#4CAF50', marginBottom: '10px' }}>Free</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $0
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>Perfect for getting started</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Up to 10 memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Basic story creation</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ 2 family members</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Voice search</li>
-                </ul>
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
-                }}>
-                  Current Plan
-                </button>
-              </div>
-
-              {/* Premium Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 8px 20px rgba(156, 39, 176, 0.15)',
-                textAlign: 'center',
-                border: '2px solid #9C27B0',
-                position: 'relative'
-              }}>
-                <h3 style={{ color: '#9C27B0', marginBottom: '10px' }}>Premium</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $4.99
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>For active families</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ AI audio story narration</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited family members</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced voice commands</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain verification</li>
-                </ul>
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#9C27B0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
-                }}>
-                  Upgrade Now
-                </button>
-              </div>
+            <h3 style={{ color: '#4CAF50', marginBottom: '10px' }}>Free</h3>
+            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
+              $0
+              <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
             </div>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Perfect for getting started</p>
+            
+            <ul style={{ 
+              listStyle: 'none', 
+              padding: 0, 
+              textAlign: 'left',
+              marginBottom: '30px'
+            }}>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Up to 10 memories</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Basic story creation</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ 2 family members</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Voice search</li>
+            </ul>
+            
+            <button style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}>
+              Current Plan
+            </button>
+          </div>
+
+          {/* Premium Plan */}
+          <div style={{ 
+            backgroundColor: 'white',
+            padding: '40px 30px',
+            borderRadius: '16px',
+            boxShadow: '0 8px 20px rgba(156, 39, 176, 0.15)',
+            textAlign: 'center',
+            border: '2px solid #9C27B0',
+            position: 'relative'
+          }}>
+            <h3 style={{ color: '#9C27B0', marginBottom: '10px' }}>Premium</h3>
+            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
+              $4.99
+              <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
+            </div>
+            <p style={{ color: '#666', marginBottom: '30px' }}>For active families</p>
+            
+            <ul style={{ 
+              listStyle: 'none', 
+              padding: 0, 
+              textAlign: 'left',
+              marginBottom: '30px'
+            }}>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited memories</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ AI audio story narration</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited family members</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced voice commands</li>
+              <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain verification</li>
+            </ul>
+            
+            <button style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}>
+              Upgrade Now
+            </button>
           </div>
         </div>
-        
-        {/* Bolt.new Badge - MANDATORY for Hackathon */}
-        <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 1000,
-          backgroundColor: '#000',
-          padding: '10px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}>
-          <a 
-            href="https://bolt.new" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{
-              color: '#fff',
-              textDecoration: 'none',
-              fontSize: '14px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            Built with ⚡ Bolt.new
-          </a>
-        </div>
       </div>
-    )
-  }
-
-  return null
+    </div>
+    
+    {/* Bolt.new Badge - MANDATORY for Hackathon */}
+    <div style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      zIndex: 1000,
+      backgroundColor: '#000',
+      padding: '10px 20px',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+    }}>
+      <a 
+        href="https://bolt.new" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style={{
+          color: '#fff',
+          textDecoration: 'none',
+          fontSize: '14px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        Built with ⚡ Bolt.new
+      </a>
+    </div>
+  </div>
+)
 }
-
+return null
+}
 export default App
