@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://example.supabase.co'
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'example-key'
+// Initialize Supabase client with your credentials
+const supabaseUrl = 'https://tzfvteccfyxfefwhmara.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6ZnZ0ZWNjZnl4ZmVmd2htYXJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEyNjUxMjUsImV4cCI6MjA2Njg0MTEyNX0.2V5VDPPGTxo4R-_s-e7eBUEc7MF8N0s-9zdsZpCNFgY'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 function App() {
@@ -21,11 +21,11 @@ function App() {
   const [successMessage, setSuccessMessage] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
-  const [supabaseReady, setSupabaseReady] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [voiceSearchActive, setVoiceSearchActive] = useState(false)
   const [voiceSearchResults, setVoiceSearchResults] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   
   // Refs
   const mediaRecorderRef = useRef(null)
@@ -74,28 +74,125 @@ function App() {
     ]
   }
 
-  // Check Supabase connection on mount
+  // Initialize Supabase Auth
   useEffect(() => {
-    const checkSupabase = async () => {
+    let mounted = true
+
+    // Check for existing session
+    const initializeAuth = async () => {
       try {
-        const { data, error } = await supabase.from('memories').select('count')
-        if (!error) {
-          setSupabaseReady(true)
-          console.log('✅ Supabase connected')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted && session?.user) {
+          setCurrentUser(session.user)
+          await loadUserData(session.user.id)
         }
-      } catch (err) {
-        console.log('Using localStorage fallback')
+      } catch (error) {
+        console.error('Auth initialization error:', error)
+      } finally {
+        if (mounted) setIsLoading(false)
       }
     }
-    
-    checkSupabase()
-    
-    // Load from localStorage
-    const savedMemories = localStorage.getItem('memories')
-    if (savedMemories) {
-      setMemories(JSON.parse(savedMemories))
+
+    initializeAuth()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (mounted) {
+        if (session?.user) {
+          setCurrentUser(session.user)
+          await loadUserData(session.user.id)
+        } else {
+          setCurrentUser(null)
+          setMemories([])
+          setStories([])
+          setFamilyMembers([])
+        }
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
     }
   }, [])
+
+  // Load user data from Supabase
+  const loadUserData = async (userId) => {
+    try {
+      // Load memories
+      const { data: memoriesData, error: memoriesError } = await supabase
+        .from('memories')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (!memoriesError && memoriesData) {
+        setMemories(memoriesData)
+      }
+
+      // Load stories
+      const { data: storiesData, error: storiesError } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (!storiesError && storiesData) {
+        setStories(storiesData)
+      }
+
+      // Load family members
+      const { data: familyData, error: familyError } = await supabase
+        .from('family_members')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (!familyError && familyData) {
+        setFamilyMembers(familyData)
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error)
+    }
+  }
+
+  // Upload audio to Supabase Storage
+  const uploadAudio = async (audioBlob, type = 'memory') => {
+    if (!currentUser) return null
+
+    const fileName = `${currentUser.id}/${type}/${Date.now()}.webm`
+    
+    try {
+      // First, ensure the bucket exists
+      const { data, error } = await supabase.storage
+        .from('audio-recordings')
+        .upload(fileName, audioBlob, {
+          contentType: 'audio/webm',
+          upsert: false
+        })
+      
+      if (error) {
+        console.error('Upload error:', error)
+        // If bucket doesn't exist, show helpful message
+        if (error.message.includes('bucket')) {
+          alert('Please create "audio-recordings" bucket in Supabase Storage')
+        }
+        return null
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('audio-recordings')
+        .getPublicUrl(fileName)
+      
+      return publicUrl
+    } catch (error) {
+      console.error('Upload error:', error)
+      return null
+    }
+  }
 
   // Transcription function with real OpenAI API
   const transcribeAudio = async (audioBlob) => {
@@ -185,39 +282,53 @@ function App() {
       
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const audioUrl = URL.createObjectURL(audioBlob)
+        
+        // Upload audio to Supabase Storage
+        const audioUrl = await uploadAudio(audioBlob, 'memory')
+        
+        if (!audioUrl) {
+          alert('Failed to upload audio. Please try again.')
+          return
+        }
         
         // Transcribe the audio
         const transcript = await transcribeAudio(audioBlob)
         
-        if (transcript) {
-          const newMemory = {
-            id: Date.now(),
-            emotion: selectedEmotion,
-            prompt: selectedPrompt,
-            audioUrl: audioUrl,
-            transcript: transcript,
-            date: new Date().toISOString(),
-            mood: getMoodFromEmotion(selectedEmotion),
-            themes: getThemesFromTranscript(transcript)
+        if (transcript && currentUser) {
+          // Save to Supabase database
+          const { data, error } = await supabase
+            .from('memories')
+            .insert([{
+              user_id: currentUser.id,
+              emotion: selectedEmotion,
+              transcript: transcript,
+              audio_url: audioUrl,
+              blockchain_tx: null // Will be added when blockchain integration is ready
+            }])
+            .select()
+            .single()
+          
+          if (error) {
+            console.error('Save error:', error)
+            alert('Failed to save memory. Please try again.')
+            return
           }
           
-          const updatedMemories = [...memories, newMemory]
-          setMemories(updatedMemories)
-          localStorage.setItem('memories', JSON.stringify(updatedMemories))
-          
-          // Try to save to Supabase
-          if (supabaseReady) {
-            try {
-              await supabase.from('memories').insert([newMemory])
-            } catch (err) {
-              console.log('Saved to localStorage only')
+          // Add to local state with themes
+          if (data) {
+            const memoryWithThemes = {
+              ...data,
+              mood: getMoodFromEmotion(selectedEmotion),
+              themes: getThemesFromTranscript(transcript)
             }
+            setMemories([memoryWithThemes, ...memories])
+            setSuccessMessage('Memory Preserved! 🎉')
+            setTimeout(() => setSuccessMessage(''), 3000)
+            setCurrentScreen('memories')
+            
+            // Play success sound
+            playSound([261.63, 329.63, 392.00], 0.15) // C4-E4-G4
           }
-          
-          setSuccessMessage('Memory Preserved! 🎉')
-          setTimeout(() => setSuccessMessage(''), 3000)
-          setCurrentScreen('memories')
         }
       }
       
@@ -372,48 +483,33 @@ function App() {
         storyText = data.choices[0].message.content
       }
       
-      // Generate audio narration with ElevenLabs
-      let audioUrl = null
-      const elevenLabsKey = import.meta.env.VITE_ELEVENLABS_API_KEY
+      // Save story to Supabase
+      const storyData = {
+        user_id: currentUser.id,
+        memory_ids: selectedMems.map(m => m.id),
+        story_text: storyText,
+        audio_url: null // Will be set after audio generation
+      }
       
-      if (elevenLabsKey) {
-        try {
-          const audioResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-            method: 'POST',
-            headers: {
-              'Accept': 'audio/mpeg',
-              'Content-Type': 'application/json',
-              'xi-api-key': elevenLabsKey
-            },
-            body: JSON.stringify({
-              text: storyText,
-              model_id: 'eleven_monolingual_v1',
-              voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.5
-              }
-            })
-          })
-          
-          if (audioResponse.ok) {
-            const audioBlob = await audioResponse.blob()
-            audioUrl = URL.createObjectURL(audioBlob)
-          }
-        } catch (err) {
-          console.log('Audio generation failed, story will be text-only')
-        }
+      const { data: savedStory, error } = await supabase
+        .from('stories')
+        .insert([storyData])
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error saving story:', error)
+        alert('Failed to save story. Please try again.')
+        return
       }
       
       const newStory = {
-        id: Date.now(),
+        ...savedStory,
         title: `A ${emotions} family story`,
-        content: storyText,
-        memories: selectedMems,
-        date: new Date().toISOString(),
-        audio_url: audioUrl
+        memories: selectedMems
       }
       
-      setStories([...stories, newStory])
+      setStories([newStory, ...stories])
       setSelectedMemories([])
       setSuccessMessage('Story Created! ✨')
       setTimeout(() => setSuccessMessage(''), 3000)
@@ -423,6 +519,94 @@ function App() {
       alert('Story generation failed. Please try again.')
     } finally {
       setIsGenerating(false)
+      setActiveIntegration('')
+    }
+  }
+
+  // Generate Audio Narration with ElevenLabs
+  const generateAudioNarration = async (story) => {
+    setActiveIntegration('🎭 Generating audio with ElevenLabs...')
+    
+    try {
+      const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY
+      
+      if (!apiKey) {
+        // Create realistic mock audio
+        setTimeout(async () => {
+          // Create a mock audio blob
+          const mockAudioData = new Uint8Array(44100 * 2 * 10) // 10 seconds of silence
+          const audioBlob = new Blob([mockAudioData], { type: 'audio/mpeg' })
+          
+          // Upload to Supabase
+          const audioUrl = await uploadAudio(audioBlob, 'story')
+          
+          if (audioUrl) {
+            // Update story with audio URL
+            const { error } = await supabase
+              .from('stories')
+              .update({ audio_url: audioUrl })
+              .eq('id', story.id)
+            
+            if (!error) {
+              // Update local state
+              setStories(stories.map(s => 
+                s.id === story.id ? { ...s, audio_url: audioUrl } : s
+              ))
+              
+              setSuccessMessage('Audio narration created! 🎭')
+              setTimeout(() => setSuccessMessage(''), 3000)
+            }
+          }
+          
+          setActiveIntegration('')
+        }, 3000)
+        return
+      }
+      
+      // Real ElevenLabs API call
+      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey
+        },
+        body: JSON.stringify({
+          text: story.story_text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        })
+      })
+      
+      if (response.ok) {
+        const audioBlob = await response.blob()
+        const audioUrl = await uploadAudio(audioBlob, 'story')
+        
+        if (audioUrl) {
+          // Update story with audio URL
+          const { error } = await supabase
+            .from('stories')
+            .update({ audio_url: audioUrl })
+            .eq('id', story.id)
+          
+          if (!error) {
+            setStories(stories.map(s => 
+              s.id === story.id ? { ...s, audio_url: audioUrl } : s
+            ))
+            
+            setSuccessMessage('Audio narration created! 🎭')
+            setTimeout(() => setSuccessMessage(''), 3000)
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Audio generation error:', error)
+      alert('Audio generation failed. Please try again.')
+    } finally {
       setActiveIntegration('')
     }
   }
@@ -451,7 +635,7 @@ function App() {
       const results = memories.filter(memory => {
         const matchesTranscript = memory.transcript.toLowerCase().includes(transcript)
         const matchesEmotion = transcript.includes(memory.emotion)
-        const matchesMood = transcript.includes(memory.mood.toLowerCase())
+        const matchesMood = memory.mood && transcript.includes(memory.mood.toLowerCase())
         return matchesTranscript || matchesEmotion || matchesMood
       })
       
@@ -460,7 +644,7 @@ function App() {
       
       // Auto-play if user says "play" and there's only one result
       if (transcript.includes('play') && results.length === 1) {
-        const audio = new Audio(results[0].audioUrl)
+        const audio = new Audio(results[0].audio_url)
         audio.play()
       }
     }
@@ -479,15 +663,67 @@ function App() {
   }
 
   // Add Family Member
-  const addFamilyMember = (name, email, access) => {
-    const newMember = {
-      id: Date.now(),
-      name,
-      email,
-      access,
-      joined: new Date().toISOString()
+  const addFamilyMember = async (name, email, access) => {
+    if (!currentUser) return
+
+    try {
+      const { data, error } = await supabase
+        .from('family_members')
+        .insert([{
+          user_id: currentUser.id,
+          member_email: email,
+          access_level: access || 'selected'
+        }])
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error adding family member:', error)
+        alert('Failed to add family member. Please try again.')
+        return
+      }
+      
+      if (data) {
+        // Add name to the data for display
+        const memberWithName = { ...data, name }
+        setFamilyMembers([...familyMembers, memberWithName])
+        setSuccessMessage('Family member invited! 💌')
+        setTimeout(() => setSuccessMessage(''), 3000)
+      }
+    } catch (error) {
+      console.error('Error adding family member:', error)
     }
-    setFamilyMembers([...familyMembers, newMember])
+  }
+
+  // Check if user has premium (based on memory count for demo)
+  const isPremium = () => {
+    return memories.length < 10 || currentUser?.user_metadata?.isPremium
+  }
+
+  // Loading screen
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '3px solid #ddd',
+            borderTop: '3px solid #4CAF50',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }}></div>
+          <p>Loading your memories...</p>
+        </div>
+      </div>
+    )
   }
 
   // Render UI
@@ -550,144 +786,146 @@ function App() {
           </h2>
           
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={() => setCurrentScreen('welcome')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'welcome' ? '#4CAF50' : 'transparent',
-                color: currentScreen === 'welcome' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'welcome' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => setCurrentScreen('record')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'record' ? '#4CAF50' : 'transparent',
-                color: currentScreen === 'record' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'record' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Record
-            </button>
-            <button
-              onClick={() => setCurrentScreen('memories')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'memories' ? '#4CAF50' : 'transparent',
-                color: currentScreen === 'memories' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'memories' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Memories
-            </button>
-            <button
-              onClick={() => setCurrentScreen('stories')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'stories' ? '#4CAF50' : 'transparent',
-                color: currentScreen === 'stories' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'stories' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Stories
-            </button>
-            <button
-              onClick={() => setCurrentScreen('family')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'family' ? '#4CAF50' : 'transparent',
-                color: currentScreen === 'family' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'family' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Family
-            </button>
-            <button
-              onClick={() => setCurrentScreen('pricing')}
-              style={{
-                padding: '8px 20px',
-                backgroundColor: currentScreen === 'pricing' ? '#9C27B0' : 'transparent',
-                color: currentScreen === 'pricing' ? 'white' : '#555',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: currentScreen === 'pricing' ? '600' : '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = '#f5f5f5')}
-              onMouseLeave={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = 'transparent')}
-            >
-              Pricing
-            </button>
-            
             {currentUser && (
-              <button
-                onClick={() => {
-                  setCurrentUser(null)
-                  setCurrentScreen('welcome')
-                }}
-                style={{
-                  padding: '6px 16px',
-                  backgroundColor: 'transparent',
-                  color: '#ff4444',
-                  border: '1px solid #ff4444',
-                  borderRadius: '15px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  marginLeft: '10px'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#ff4444'
-                  e.target.style.color = 'white'
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent'
-                  e.target.style.color = '#ff4444'
-                }}
-              >
-                Sign Out
-              </button>
+              <>
+                <button
+                  onClick={() => setCurrentScreen('welcome')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'welcome' ? '#4CAF50' : 'transparent',
+                    color: currentScreen === 'welcome' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'welcome' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Home
+                </button>
+                <button
+                  onClick={() => setCurrentScreen('record')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'record' ? '#4CAF50' : 'transparent',
+                    color: currentScreen === 'record' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'record' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Record
+                </button>
+                <button
+                  onClick={() => setCurrentScreen('memories')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'memories' ? '#4CAF50' : 'transparent',
+                    color: currentScreen === 'memories' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'memories' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Memories
+                </button>
+                <button
+                  onClick={() => setCurrentScreen('stories')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'stories' ? '#4CAF50' : 'transparent',
+                    color: currentScreen === 'stories' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'stories' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Stories
+                </button>
+                <button
+                  onClick={() => setCurrentScreen('family')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'family' ? '#4CAF50' : 'transparent',
+                    color: currentScreen === 'family' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'family' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Family
+                </button>
+                <button
+                  onClick={() => setCurrentScreen('pricing')}
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: currentScreen === 'pricing' ? '#9C27B0' : 'transparent',
+                    color: currentScreen === 'pricing' ? 'white' : '#555',
+                    border: 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: currentScreen === 'pricing' ? '600' : '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = '#f5f5f5')}
+                  onMouseLeave={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = 'transparent')}
+                >
+                  Pricing
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut()
+                    setCurrentScreen('welcome')
+                  }}
+                  style={{
+                    padding: '6px 16px',
+                    backgroundColor: 'transparent',
+                    color: '#ff4444',
+                    border: '1px solid #ff4444',
+                    borderRadius: '15px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s ease',
+                    marginLeft: '10px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#ff4444'
+                    e.target.style.color = 'white'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent'
+                    e.target.style.color = '#ff4444'
+                  }}
+                >
+                  Sign Out
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -773,7 +1011,7 @@ function App() {
                     <button
                       key={emotion}
                       onClick={() => {
-                        if (memories.length >= 10 && !currentUser?.isPremium) {
+                        if (!isPremium()) {
                           alert('Upgrade to Premium for unlimited memories! 🌟')
                           setCurrentScreen('pricing')
                           return
@@ -794,7 +1032,7 @@ function App() {
                         transform: 'translateY(0)',
                         transition: 'all 0.3s ease',
                         textTransform: 'capitalize',
-                        opacity: memories.length >= 10 && !currentUser?.isPremium ? 0.6 : 1
+                        opacity: !isPremium() ? 0.6 : 1
                       }}
                       onMouseEnter={(e) => {
                         e.target.style.transform = 'translateY(-5px)'
@@ -851,28 +1089,108 @@ function App() {
                   borderRadius: '16px',
                   marginBottom: '20px'
                 }}>
-                  <h3 style={{ marginBottom: '20px' }}>Join thousands preserving family stories</h3>
-                  <p style={{ color: '#666', marginBottom: '20px' }}>
-                    Simple voice recording • AI-powered transcription • Beautiful audio narratives
+                  <h3 style={{ marginBottom: '20px' }}>Sign In or Sign Up</h3>
+                  
+                  <form onSubmit={async (e) => {
+                    e.preventDefault()
+                    const email = e.target.email.value
+                    const password = e.target.password.value
+                    const isSignUp = e.submitter.name === 'signup'
+                    
+                    setActiveIntegration(isSignUp ? '🔐 Creating account...' : '🔐 Signing in...')
+                    
+                    try {
+                      if (isSignUp) {
+                        const { error } = await supabase.auth.signUp({
+                          email,
+                          password,
+                          options: {
+                            emailRedirectTo: window.location.origin
+                          }
+                        })
+                        if (error) throw error
+                        alert('Check your email for confirmation link!')
+                      } else {
+                        const { error } = await supabase.auth.signInWithPassword({
+                          email,
+                          password,
+                        })
+                        if (error) throw error
+                      }
+                    } catch (error) {
+                      alert(error.message)
+                    } finally {
+                      setActiveIntegration('')
+                    }
+                  }}>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Email"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        marginBottom: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '16px'
+                      }}
+                    />
+                    <input
+                      type="password"
+                      name="password"
+                      placeholder="Password (min 6 characters)"
+                      required
+                      minLength={6}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        marginBottom: '20px',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        fontSize: '16px'
+                      }}
+                    />
+                    <button 
+                      type="submit"
+                      name="signin"
+                      style={{
+                        width: '100%',
+                        padding: '15px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        marginBottom: '10px'
+                      }}
+                    >
+                      Sign In
+                    </button>
+                    <button 
+                      type="submit"
+                      name="signup"
+                      style={{
+                        width: '100%',
+                        padding: '15px',
+                        backgroundColor: '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Sign Up
+                    </button>
+                  </form>
+                  <p style={{ fontSize: '14px', color: '#666', marginTop: '15px' }}>
+                    Sign up to start preserving your memories
                   </p>
-                  <button
-                    onClick={() => setCurrentUser({ email: 'demo@example.com', isPremium: false })}
-                    style={{
-                      width: '100%',
-                      padding: '15px',
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '18px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      marginBottom: '10px'
-                    }}
-                  >
-                    Get Started Free
-                  </button>
-                  <p style={{ fontSize: '14px', color: '#666' }}>No credit card required</p>
                 </div>
               </div>
             )}
@@ -880,7 +1198,7 @@ function App() {
         )}
 
         {/* Record Screen */}
-        {currentScreen === 'record' && selectedEmotion && (
+        {currentScreen === 'record' && selectedEmotion && currentUser && (
           <div style={{ 
             padding: '40px 20px',
             textAlign: 'center',
@@ -1023,7 +1341,7 @@ function App() {
         )}
 
         {/* Memories Screen */}
-        {currentScreen === 'memories' && (
+        {currentScreen === 'memories' && currentUser && (
           <div style={{ padding: '40px 20px' }}>
             <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
               Your Memory Collection
@@ -1067,7 +1385,7 @@ function App() {
                     <div 
                       key={memory.id}
                       onClick={() => {
-                        const audio = new Audio(memory.audioUrl)
+                        const audio = new Audio(memory.audio_url)
                         audio.play()
                       }}
                       style={{
@@ -1180,7 +1498,7 @@ function App() {
                         {memory.emotion}
                       </span>
                       <span style={{ fontSize: '14px', color: '#999' }}>
-                        {new Date(memory.date).toLocaleDateString()}
+                        {new Date(memory.created_at).toLocaleDateString()}
                       </span>
                     </div>
                     
@@ -1218,7 +1536,7 @@ function App() {
                     <audio 
                       controls 
                       style={{ width: '100%', marginBottom: '10px' }}
-                      src={memory.audioUrl}
+                      src={memory.audio_url}
                     />
                     
                     <button 
@@ -1259,7 +1577,7 @@ function App() {
         )}
 
         {/* Stories Screen */}
-        {currentScreen === 'stories' && (
+        {currentScreen === 'stories' && currentUser && (
           <div style={{ padding: '40px 20px' }}>
             <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
               Transform Your Memories into Audio Stories
@@ -1399,17 +1717,19 @@ function App() {
                           border: '1px solid #eee'
                         }}
                       >
-                        <h4 style={{ marginBottom: '15px', color: '#333' }}>{story.title}</h4>
+                        <h4 style={{ marginBottom: '15px', color: '#333' }}>
+                          {story.title || `Story from ${new Date(story.created_at).toLocaleDateString()}`}
+                        </h4>
                         <p style={{ 
                           fontSize: '16px',
                           lineHeight: '1.8',
                           color: '#555',
                           marginBottom: '20px'
                         }}>
-                          {story.content}
+                          {story.story_text}
                         </p>
                         
-                        {story.audio_url && (
+                        {story.audio_url ? (
                           <div style={{ marginBottom: '15px' }}>
                             <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
                               🎭 Narrated by ElevenLabs AI
@@ -1420,71 +1740,9 @@ function App() {
                               src={story.audio_url}
                             />
                           </div>
-                        )}
-                        
-                        {!story.audio_url && (
+                        ) : (
                           <button
-                            onClick={async () => {
-                              setActiveIntegration('🎭 Generating audio with ElevenLabs...')
-                              
-                              try {
-                                const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY
-                                
-                                if (!apiKey) {
-                                  // Create realistic mock audio
-                                  setTimeout(() => {
-                                    const audioBlob = new Blob(['mock audio data'], { type: 'audio/mpeg' })
-                                    const audioUrl = URL.createObjectURL(audioBlob)
-                                    
-                                    // Update story with audio URL
-                                    setStories(stories.map(s => 
-                                      s.id === story.id ? { ...s, audio_url: audioUrl } : s
-                                    ))
-                                    
-                                    setActiveIntegration('')
-                                    setSuccessMessage('Audio narration created! 🎭')
-                                    setTimeout(() => setSuccessMessage(''), 3000)
-                                  }, 3000)
-                                  return
-                                }
-                                
-                                // Real ElevenLabs API call
-                                const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Accept': 'audio/mpeg',
-                                    'Content-Type': 'application/json',
-                                    'xi-api-key': apiKey
-                                  },
-                                  body: JSON.stringify({
-                                    text: story.content,
-                                    model_id: 'eleven_monolingual_v1',
-                                    voice_settings: {
-                                      stability: 0.5,
-                                      similarity_boost: 0.5
-                                    }
-                                  })
-                                })
-                                
-                                if (response.ok) {
-                                  const audioBlob = await response.blob()
-                                  const audioUrl = URL.createObjectURL(audioBlob)
-                                  
-                                  setStories(stories.map(s => 
-                                    s.id === story.id ? { ...s, audio_url: audioUrl } : s
-                                  ))
-                                  
-                                  setSuccessMessage('Audio narration created! 🎭')
-                                  setTimeout(() => setSuccessMessage(''), 3000)
-                                }
-                                
-                              } catch (error) {
-                                console.error('Audio generation error:', error)
-                                alert('Audio generation failed. Please try again.')
-                              } finally {
-                                setActiveIntegration('')
-                              }
-                            }}
+                            onClick={() => generateAudioNarration(story)}
                             style={{
                               padding: '10px 20px',
                               backgroundColor: '#9C27B0',
@@ -1503,7 +1761,7 @@ function App() {
                         )}
                         
                         <div style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-                          Created from {story.memories.length} memories • {new Date(story.date).toLocaleDateString()}
+                          Created from {story.memory_ids?.length || 0} memories
                         </div>
                         
                         <button
@@ -1537,7 +1795,7 @@ function App() {
         )}
 
         {/* Family Screen */}
-        {currentScreen === 'family' && (
+        {currentScreen === 'family' && currentUser && (
           <div style={{ padding: '40px 20px' }}>
             <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
               Family Access
@@ -1563,8 +1821,6 @@ function App() {
                     const email = prompt('Their email:')
                     if (name && email) {
                       addFamilyMember(name, email, 'viewer')
-                      setSuccessMessage('Family member invited! 💌')
-                      setTimeout(() => setSuccessMessage(''), 3000)
                     }
                   }}
                   style={{
@@ -1605,8 +1861,6 @@ function App() {
                       const email = prompt('Their email:')
                       if (name && email) {
                         addFamilyMember(name, email, 'viewer')
-                        setSuccessMessage('Family member invited! 💌')
-                        setTimeout(() => setSuccessMessage(''), 3000)
                       }
                     }}
                     style={{
@@ -1640,9 +1894,9 @@ function App() {
                         boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
                       }}
                     >
-                      <h4 style={{ marginBottom: '10px' }}>{member.name}</h4>
+                      <h4 style={{ marginBottom: '10px' }}>{member.name || 'Family Member'}</h4>
                       <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-                        {member.email}
+                        {member.member_email}
                       </p>
                       <div style={{ 
                         display: 'flex',
@@ -1651,21 +1905,28 @@ function App() {
                       }}>
                         <span style={{
                           padding: '4px 12px',
-                          backgroundColor: member.access === 'contributor' ? '#4CAF50' : '#2196F3',
+                          backgroundColor: member.access_level === 'all' ? '#4CAF50' : '#2196F3',
                           color: 'white',
                           borderRadius: '12px',
                           fontSize: '12px'
                         }}>
-                          {member.access}
+                          {member.access_level}
                         </span>
                         <button
-                          onClick={() => {
-                            const updatedMembers = familyMembers.map(m => 
-                              m.id === member.id 
-                                ? { ...m, access: m.access === 'viewer' ? 'contributor' : 'viewer' }
-                                : m
-                            )
-                            setFamilyMembers(updatedMembers)
+                          onClick={async () => {
+                            const newAccess = member.access_level === 'selected' ? 'all' : 'selected'
+                            const { error } = await supabase
+                              .from('family_members')
+                              .update({ access_level: newAccess })
+                              .eq('id', member.id)
+                            
+                            if (!error) {
+                              setFamilyMembers(familyMembers.map(m => 
+                                m.id === member.id 
+                                  ? { ...m, access_level: newAccess }
+                                  : m
+                              ))
+                            }
                           }}
                           style={{
                             padding: '6px 12px',
@@ -1834,8 +2095,8 @@ function App() {
                     setActiveIntegration('💳 Processing with RevenueCat...')
                     setTimeout(() => {
                       setActiveIntegration('')
-                      alert('Premium upgrade successful! 🎉')
-                      setCurrentUser({ ...currentUser, isPremium: true })
+                      alert('Premium upgrade successful! 🎉\n\nIn production, this would process payment through RevenueCat.')
+                      // In production, would update user metadata
                       setCurrentScreen('welcome')
                     }, 2000)
                   }}
