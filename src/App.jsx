@@ -205,23 +205,105 @@ const transcribeAudio = async () => {
     }
   }
 
-  // Story generation
-  const generateStory = async () => {
-    if (selectedMemories.length === 0) return
+// Story generation with real GPT-4 API
+const generateStory = async () => {
+  if (selectedMemories.length === 0) return
+  
+  setIsGeneratingStory(true)
+  
+  try {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY
     
-    setIsGeneratingStory(true)
+    if (!apiKey) {
+      console.error('OpenAI API key not found')
+      // Fallback to mock
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
+      const storyText = `Once upon a time, there were beautiful moments that shaped a family's journey together. ${selectedMemoryData.map(m => m.transcript).join(' ')} These memories, woven together, tell the story of love, growth, and the precious bonds that connect us all.`
+      
+      const story = {
+        user_id: user.id,
+        memory_ids: selectedMemories,
+        story_text: storyText,
+        audio_url: null
+      }
+      
+      const savedStory = await storyService.saveStory(story)
+      if (savedStory) {
+        setStories(prev => [savedStory, ...prev])
+        setSelectedMemories([])
+      }
+      setIsGeneratingStory(false)
+      return
+    }
     
-    // Mock story generation - in real app, you'd call AI service
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
+    // Get selected memories data
     const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
-    const storyText = `Once upon a time, there were beautiful moments that shaped a family's journey together. ${selectedMemoryData.map(m => m.transcript).join(' ')} These memories, woven together, tell the story of love, growth, and the precious bonds that connect us all.`
     
+    // Create prompt for GPT-4
+    const prompt = `You are a talented storyteller creating a heartwarming family narrative. 
+    
+    Based on these family memories, create a beautiful, cohesive story that weaves them together:
+    
+    ${selectedMemoryData.map((m, i) => `Memory ${i + 1} (${m.emotion}): ${m.transcript}`).join('\n\n')}
+    
+    Create a narrative that:
+    - Connects these memories into a flowing story
+    - Captures the emotions and significance
+    - Uses vivid, descriptive language
+    - Is suitable for all ages
+    - Feels like a treasured family story
+    - Is 150-250 words long
+    
+    Write the story in a warm, engaging narrative style.`
+    
+    // Call GPT-4 API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a skilled family storyteller who creates beautiful, emotional narratives from personal memories.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 500
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const storyText = data.choices[0].message.content
+    
+    console.log('Story generated successfully')
+    
+    // Generate audio narration if ElevenLabs API key is available
+    let audioUrl = null
+    const elevenLabsKey = import.meta.env.VITE_ELEVENLABS_API_KEY
+    
+    if (elevenLabsKey) {
+      audioUrl = await generateAudioNarration(storyText, elevenLabsKey)
+    }
+    
+    // Save story to database
     const story = {
       user_id: user.id,
       memory_ids: selectedMemories,
       story_text: storyText,
-      audio_url: null // In real app, you'd generate audio narration
+      audio_url: audioUrl
     }
     
     const savedStory = await storyService.saveStory(story)
@@ -230,8 +312,13 @@ const transcribeAudio = async () => {
       setSelectedMemories([])
     }
     
+  } catch (error) {
+    console.error('Story generation error:', error)
+    alert('Story generation failed. Please try again.')
+  } finally {
     setIsGeneratingStory(false)
   }
+}
 
   // Family member management
   const addFamilyMember = async (e) => {
