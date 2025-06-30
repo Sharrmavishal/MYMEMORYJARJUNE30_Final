@@ -565,6 +565,28 @@ function App() {
             </button>
           </div>
         </div>
+
+        {/* Footer */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '60px', 
+          padding: '20px',
+          borderTop: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          <p style={{ 
+            color: 'rgba(255,255,255,0.7)', 
+            fontSize: '14px',
+            marginBottom: '10px'
+          }}>
+            Built with: Bolt.new | Supabase | OpenAI | ElevenLabs | Algorand | RevenueCat | Entri | Netlify
+          </p>
+          <p style={{ 
+            color: 'rgba(255,255,255,0.5)', 
+            fontSize: '12px'
+          }}>
+            Preserving family memories for future generations
+          </p>
+        </div>
       </div>
     )
   }
@@ -1311,8 +1333,8 @@ function App() {
 
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div>
-            <h2>Pricing Plans</h2>
-            <p style={{ color: '#666', marginBottom: '40px', textAlign: 'center' }}>
+            <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '20px' }}>Pricing Plans</h2>
+            <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '40px', textAlign: 'center' }}>
               Choose the perfect plan for your family's memory preservation needs
             </p>
 
