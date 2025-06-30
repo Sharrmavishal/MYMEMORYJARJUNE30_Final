@@ -413,6 +413,35 @@ function App() {
             </div>
           </form>
         </div>
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
       </div>
     )
   }
@@ -614,6 +643,35 @@ function App() {
               💳 Pricing Plans
             </button>
           </div>
+        </div>
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
         </div>
       </div>
     )
@@ -1018,6 +1076,35 @@ function App() {
             )}
           </div>
         </div>
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
       </div>
     )
   }
@@ -1233,6 +1320,35 @@ function App() {
             )}
           </div>
         </div>
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
       </div>
     )
   }
@@ -1407,6 +1523,35 @@ function App() {
             )}
           </div>
         </div>
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
       </div>
     )
   }
@@ -1571,17 +1716,34 @@ function App() {
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '40px', 
-          color: 'rgba(255,255,255,0.8)',
-          fontSize: '14px'
+        
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
         }}>
-          <p style={{ margin: '10px 0' }}>
-            Built with: Bolt.new | Supabase | OpenAI | ElevenLabs | Algorand | RevenueCat | Entri | Netlify
-          </p>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
         </div>
       </div>
     )
