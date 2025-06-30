@@ -1642,68 +1642,6 @@ const generateAudioNarration = async (text, apiKey) => {
     </div>
   )}
 </div>
-
-{/* Sharing Options */}
-{story.audio_url && (
-  <div style={{ 
-    marginTop: '15px',
-    display: 'flex',
-    gap: '10px',
-    justifyContent: 'center'
-  }}>
-    <button
-      onClick={() => {
-        // Share via Web Share API
-        if (navigator.share) {
-          navigator.share({
-            title: 'Family Memory Story',
-            text: story.story_text.substring(0, 100) + '...',
-            url: story.audio_url
-          })
-        } else {
-          // Fallback - copy to clipboard
-          navigator.clipboard.writeText(story.audio_url)
-          alert('Story link copied to clipboard!')
-        }
-      }}
-      style={{
-        padding: '8px 16px',
-        backgroundColor: '#1DA1F2',
-        color: 'white',
-        border: 'none',
-        borderRadius: '20px',
-        cursor: 'pointer',
-        fontSize: '14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '5px'
-      }}
-    >
-      📤 Share Story
-    </button>
-    
-    <button
-      onClick={() => {
-        // Download audio
-        const a = document.createElement('a')
-        a.href = story.audio_url
-        a.download = `family-story-${story.id}.mp3`
-        a.click()
-      }}
-      style={{
-        padding: '8px 16px',
-        backgroundColor: '#4CAF50',
-        color: 'white',
-        border: 'none',
-        borderRadius: '20px',
-        cursor: 'pointer',
-        fontSize: '14px'
-      }}
-    >
-      💾 Download
-    </button>
-  </div>
-)}
         
         {/* Bolt.new Badge - MANDATORY for Hackathon */}
         <div style={{
