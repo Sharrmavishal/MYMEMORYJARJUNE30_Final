@@ -25,6 +25,9 @@ function App() {
   const [selectedMemories, setSelectedMemories] = useState([])
   const [isGeneratingStory, setIsGeneratingStory] = useState(false)
   const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const [voiceSearchActive, setVoiceSearchActive] = useState(false)
+  const [voiceSearchResults, setVoiceSearchResults] = useState([])
   
   // Refs
   const mediaRecorderRef = useRef(null)
@@ -213,6 +216,53 @@ function App() {
         prev.map(m => m.id === memberId ? { ...m, access_level: accessLevel } : m)
       )
     }
+  }
+
+  const startVoiceSearch = () => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice search is not supported in your browser. Try Chrome or Edge.')
+      return
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = 'en-US'
+    
+    recognition.onstart = () => {
+      setIsListening(true)
+      setVoiceSearchActive(true)
+      setVoiceSearchResults([])
+    }
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.toLowerCase()
+      
+      const results = memories.filter(memory => 
+        memory.transcript.toLowerCase().includes(transcript) ||
+        memory.emotion.toLowerCase().includes(transcript)
+      )
+      
+      setVoiceSearchResults(results)
+      
+      if (results.length === 1 && transcript.includes('play')) {
+        const audio = new Audio(results[0].audio_url)
+        audio.play()
+      }
+    }
+    
+    recognition.onerror = () => {
+      setIsListening(false)
+      alert('Voice search failed. Please try again.')
+    }
+    
+    recognition.onend = () => {
+      setIsListening(false)
+    }
+    
+    recognition.start()
   }
 
   // Loading state
@@ -565,28 +615,6 @@ function App() {
             </button>
           </div>
         </div>
-
-        {/* Footer */}
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '60px', 
-          padding: '20px',
-          borderTop: '1px solid rgba(255,255,255,0.2)'
-        }}>
-          <p style={{ 
-            color: 'rgba(255,255,255,0.7)', 
-            fontSize: '14px',
-            marginBottom: '10px'
-          }}>
-            Built with: Bolt.new | Supabase | OpenAI | ElevenLabs | Algorand | RevenueCat | Entri | Netlify
-          </p>
-          <p style={{ 
-            color: 'rgba(255,255,255,0.5)', 
-            fontSize: '12px'
-          }}>
-            Preserving family memories for future generations
-          </p>
-        </div>
       </div>
     )
   }
@@ -845,6 +873,111 @@ function App() {
             boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
           }}>
             <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Memories</h2>
+            {/* Voice Search */}
+            <div style={{ 
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f0f8ff',
+              borderRadius: '12px',
+              border: '2px dashed #2196F3'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: '15px'
+              }}>
+                <div>
+                  <h3 style={{ margin: '0 0 5px 0' }}>🎤 Voice Search</h3>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                    Try saying: "Play grandpa's war story" or "Show happy memories"
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (isListening) {
+                      setIsListening(false)
+                      setVoiceSearchActive(false)
+                    } else {
+                      startVoiceSearch()
+                    }
+                  }}
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    borderRadius: '50%',
+                    backgroundColor: isListening ? '#ff4444' : '#2196F3',
+                    color: 'white',
+                    border: 'none',
+                    fontSize: '28px',
+                    cursor: 'pointer',
+                    boxShadow: isListening 
+                      ? '0 0 0 0 rgba(255, 68, 68, 0.4)' 
+                      : '0 6px 20px rgba(33, 150, 243, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {isListening ? '⏹️' : '🎤'}
+                </button>
+              </div>
+              
+              {isListening && (
+                <div style={{ 
+                  textAlign: 'center',
+                  padding: '20px'
+                }}>
+                  <p style={{ 
+                    fontSize: '18px', 
+                    color: '#ff4444',
+                    fontWeight: '600',
+                    margin: '0'
+                  }}>
+                    Listening...
+                  </p>
+                  <p style={{ 
+                    fontSize: '14px', 
+                    color: '#666',
+                    margin: '5px 0 0 0'
+                  }}>
+                    Speak clearly into your microphone
+                  </p>
+                </div>
+              )}
+              
+              {voiceSearchResults.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h4>Search Results:</h4>
+                  <p>{voiceSearchResults.length} memories found</p>
+                  {voiceSearchResults.map(memory => (
+                    <div key={memory.id} style={{ 
+                      padding: '15px',
+                      marginTop: '10px',
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      border: '1px solid #e0e0e0',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                    onClick={() => {
+                      if (memory.audio_url) {
+                        const audio = new Audio(memory.audio_url)
+                        audio.play()
+                      }
+                    }}>
+                      <span style={{ marginRight: '10px' }}>
+                        {memory.emotion === 'happy' && '😊'}
+                        {memory.emotion === 'sad' && '😢'}
+                        {memory.emotion === 'grateful' && '🙏'}
+                        {memory.emotion === 'excited' && '🎉'}
+                      </span>
+                      {memory.transcript.substring(0, 50)}...
+                      <span style={{ marginLeft: '10px', color: '#2196F3' }}>▶️ Play</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {memories.length === 0 ? (
               <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
                 No memories recorded yet. Start by recording your first memory above!
@@ -1332,9 +1465,14 @@ function App() {
         </div>
 
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div>
-            <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '20px' }}>Pricing Plans</h2>
-            <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '40px', textAlign: 'center' }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2>Pricing Plans</h2>
+            <p style={{ color: '#666', marginBottom: '40px', textAlign: 'center' }}>
               Choose the perfect plan for your family's memory preservation needs
             </p>
 
@@ -1432,6 +1570,18 @@ function App() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '40px', 
+          color: 'rgba(255,255,255,0.8)',
+          fontSize: '14px'
+        }}>
+          <p style={{ margin: '10px 0' }}>
+            Built with: Bolt.new | Supabase | OpenAI | ElevenLabs | Algorand | RevenueCat | Entri | Netlify
+          </p>
         </div>
       </div>
     )
