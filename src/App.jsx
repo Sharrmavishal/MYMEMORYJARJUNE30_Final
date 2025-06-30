@@ -190,15 +190,36 @@ const transcribeAudio = async () => {
   }
 }
 
-  // Save memory to database
-  const saveMemory = async () => {
-    if (!user || !transcript || !selectedEmotion) return
+ // Save memory to database with audio upload
+const saveMemory = async () => {
+  if (!user || !transcript || !selectedEmotion || !audioBlob) return
+  
+  try {
+    // First, upload the audio to Supabase Storage
+    const fileName = `recordings/${user.id}/${Date.now()}.webm`
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('audio-recordings')
+      .upload(fileName, audioBlob, {
+        contentType: 'audio/webm'
+      })
     
+    if (uploadError) {
+      console.error('Audio upload error:', uploadError)
+      alert('Failed to upload audio. Please try again.')
+      return
+    }
+    
+    // Get public URL for the uploaded audio
+    const { data: { publicUrl } } = supabaseClient.storage
+      .from('audio-recordings')
+      .getPublicUrl(fileName)
+    
+    // Now save the memory with the audio URL
     const memory = {
       user_id: user.id,
       emotion: selectedEmotion,
       transcript: transcript,
-      audio_url: null // In real app, you'd upload audio file and store URL
+      audio_url: publicUrl // Now we have the real audio URL!
     }
     
     const savedMemory = await memoryService.saveMemory(memory)
@@ -208,8 +229,15 @@ const transcribeAudio = async () => {
       setSelectedEmotion('')
       setTranscript('')
       setAudioBlob(null)
+      
+      // Show success message
+      alert('Memory saved successfully!')
     }
+  } catch (error) {
+    console.error('Error saving memory:', error)
+    alert('Failed to save memory. Please try again.')
   }
+}
 
 // Story generation with real GPT-4 API
 const generateStory = async () => {
