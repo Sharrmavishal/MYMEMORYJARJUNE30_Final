@@ -309,7 +309,7 @@ Create a narrative that faithfully preserves these exact memories, adding only m
             content: prompt
           }
         ],
-        temperature: 0.8,
+        temperature: 0.3,
         max_tokens: 500
       })
     })
