@@ -352,6 +352,7 @@ Create a narrative that faithfully preserves these exact memories, adding only m
     setIsGeneratingStory(false)
   }
 }
+  
 // After saving story to database, add blockchain verification
 if (savedStory && savedStory.audio_url) {
   try {
@@ -372,7 +373,6 @@ if (savedStory && savedStory.audio_url) {
     console.log('Blockchain verification skipped:', error)
   }
 }
-  
 
 // Generate audio narration with ElevenLabs
 const generateAudioNarration = async (text, apiKey) => {
@@ -2018,18 +2018,37 @@ Sign Out
               <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain verification</li>
             </ul>
             
-            <button style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: '#9C27B0',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              cursor: 'pointer'
-            }}>
-              Upgrade Now
-            </button>
+            <button 
+  onClick={async () => {
+    // Check if user has reached free limit
+    if (memories.length >= 10) {
+      alert('🔒 You\'ve reached the free limit of 10 memories!\n\nUpgrade to Premium for:\n• Unlimited memories\n• AI audio narration\n• Blockchain verification\n• Priority support\n\nRedirecting to payment...')
+      
+      // Mock RevenueCat - in production, use actual SDK
+      // Example: await Purchases.purchasePackage(package)
+      
+      // For demo, simulate purchase
+      setTimeout(() => {
+        alert('Payment successful! Welcome to Premium! 🎉')
+        // Update user status in database
+      }, 2000)
+    } else {
+      alert(`You have ${10 - memories.length} free memories remaining. Upgrade for unlimited access!`)
+    }
+  }}
+  style={{
+    width: '100%',
+    padding: '12px',
+    backgroundColor: '#9C27B0',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    cursor: 'pointer'
+  }}
+>
+  {memories.length >= 10 ? '🔒 Upgrade Required' : 'Upgrade to Premium'}
+</button>
           </div>
         </div>
       </div>
