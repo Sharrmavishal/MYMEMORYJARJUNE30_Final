@@ -13,7 +13,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   
   // App state
-  const [currentScreen, setCurrentScreen] = useState('welcome') // 'welcome', 'memories', 'stories', 'family', 'pricing'
+  const [currentScreen, setCurrentScreen] = useState('welcome') // 'welcome', 'memories', 'stories', 'family'
   const [selectedEmotion, setSelectedEmotion] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
@@ -476,7 +476,7 @@ function App() {
             backdropFilter: 'blur(10px)'
           }}>
             <p style={{ fontSize: '16px', marginBottom: '15px' }}>
-              <strong>How it works:</strong> Choose an emotion → Record your story → AI transcribes instantly → Create stories from your memories → Share with family
+              <strong>How it works:</strong> Choose an emotion → Record your story → AI transcribes → Create audio story narratives → Share with family
             </p>
           </div>
 
@@ -931,7 +931,7 @@ function App() {
           }}>
             <h2>Your Family Stories</h2>
             <p style={{ color: '#666', marginBottom: '30px' }}>
-              Weave your recorded memories into beautiful narratives
+              Transform your recordings into shareable audio stories
             </p>
 
             {memories.length === 0 ? (
