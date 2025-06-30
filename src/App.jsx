@@ -1345,7 +1345,7 @@ const generateAudioNarration = async (text, apiKey) => {
     )
   }
 
-  // Stories screen
+// Stories screen
   if (currentScreen === 'stories') {
     return (
       <div style={{ 
@@ -1515,133 +1515,134 @@ const generateAudioNarration = async (text, apiKey) => {
           </div>
 
           {/* Generated Stories */}
-<div style={{
-  background: 'white',
-  borderRadius: '20px',
-  padding: '30px',
-  boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-}}>
-  <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Generated Stories</h2>
-  {stories.length === 0 ? (
-    <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
-      No stories created yet. Generate your first story above!
-    </p>
-  ) : (
-    <div style={{ display: 'grid', gap: '20px' }}>
-      {stories.map((story) => (
-        <div
-          key={story.id}
-          style={{
-            border: '1px solid #e1e5e9',
-            borderRadius: '15px',
-            padding: '25px',
-            background: '#f8f9fa'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ color: '#333', margin: 0 }}>Family Story</h3>
-            <span style={{ color: '#666', fontSize: '12px' }}>
-              {new Date(story.created_at).toLocaleDateString()}
-            </span>
-          </div>
-          <p style={{ color: '#333', lineHeight: '1.6', marginBottom: '15px' }}>
-            {story.story_text}
-          </p>
-          
-          {/* Audio Player for Narration */}
-          {story.audio_url && (
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '15px', 
-              backgroundColor: '#f0f8ff',
-              borderRadius: '10px',
-              border: '1px solid #2196F3'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                <span style={{ fontSize: '20px' }}>🎧</span>
-                <strong style={{ color: '#2196F3' }}>Listen to Audio Narration</strong>
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Generated Stories</h2>
+            {stories.length === 0 ? (
+              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+                No stories created yet. Generate your first story above!
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {stories.map((story) => (
+                  <div
+                    key={story.id}
+                    style={{
+                      border: '1px solid #e1e5e9',
+                      borderRadius: '15px',
+                      padding: '25px',
+                      background: '#f8f9fa'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ color: '#333', margin: 0 }}>Family Story</h3>
+                      <span style={{ color: '#666', fontSize: '12px' }}>
+                        {new Date(story.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p style={{ color: '#333', lineHeight: '1.6', marginBottom: '15px' }}>
+                      {story.story_text}
+                    </p>
+                    
+                    {/* Audio Player for Narration */}
+                    {story.audio_url && (
+                      <div style={{ 
+                        marginTop: '20px', 
+                        padding: '15px', 
+                        backgroundColor: '#f0f8ff',
+                        borderRadius: '10px',
+                        border: '1px solid #2196F3'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '20px' }}>🎧</span>
+                          <strong style={{ color: '#2196F3' }}>Listen to Audio Narration</strong>
+                        </div>
+                        <audio 
+                          controls 
+                          style={{ width: '100%' }}
+                          preload="metadata"
+                        >
+                          <source src={story.audio_url} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
+                    
+                    {/* Sharing Options - INSIDE the map */}
+                    {story.audio_url && (
+                      <div style={{ 
+                        marginTop: '15px',
+                        display: 'flex',
+                        gap: '10px',
+                        justifyContent: 'center'
+                      }}>
+                        <button
+                          onClick={() => {
+                            // Share via Web Share API
+                            if (navigator.share) {
+                              navigator.share({
+                                title: 'Family Memory Story',
+                                text: story.story_text.substring(0, 100) + '...',
+                                url: story.audio_url
+                              })
+                            } else {
+                              // Fallback - copy to clipboard
+                              navigator.clipboard.writeText(story.audio_url)
+                              alert('Story link copied to clipboard!')
+                            }
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#1DA1F2',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '20px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          📤 Share Story
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            // Download audio
+                            const a = document.createElement('a')
+                            a.href = story.audio_url
+                            a.download = `family-story-${story.id}.mp3`
+                            a.click()
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '20px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                          }}
+                        >
+                          💾 Download
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+                      <strong>Based on {story.memory_ids.length} memories</strong>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <audio 
-                controls 
-                style={{ width: '100%' }}
-                preload="metadata"
-              >
-                <source src={story.audio_url} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
-            </div>
-          )}
-          
-          {/* Sharing Options - INSIDE the map */}
-          {story.audio_url && (
-            <div style={{ 
-              marginTop: '15px',
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={() => {
-                  // Share via Web Share API
-                  if (navigator.share) {
-                    navigator.share({
-                      title: 'Family Memory Story',
-                      text: story.story_text.substring(0, 100) + '...',
-                      url: story.audio_url
-                    })
-                  } else {
-                    // Fallback - copy to clipboard
-                    navigator.clipboard.writeText(story.audio_url)
-                    alert('Story link copied to clipboard!')
-                  }
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#1DA1F2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                📤 Share Story
-              </button>
-              
-              <button
-                onClick={() => {
-                  // Download audio
-                  const a = document.createElement('a')
-                  a.href = story.audio_url
-                  a.download = `family-story-${story.id}.mp3`
-                  a.click()
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                💾 Download
-              </button>
-            </div>
-          )}
-          
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
-            <strong>Based on {story.memory_ids.length} memories</strong>
+            )}
           </div>
         </div>
-      ))}
-    </div>
-  )}
-</div> {/* Close the main container div */}
         
         {/* Bolt.new Badge - MANDATORY for Hackathon */}
         <div style={{
@@ -1671,9 +1672,9 @@ const generateAudioNarration = async (text, apiKey) => {
             Built with ⚡ Bolt.new
           </a>
         </div>
-      </div> {/* Close the outermost div */}
+      </div>
     )
-  } {/* Close the if statement */}
+  }
 
   // Family screen
   if (currentScreen === 'family') {
