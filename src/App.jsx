@@ -13,7 +13,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   
   // App state
-  const [currentScreen, setCurrentScreen] = useState('welcome') // 'welcome', 'memories', 'stories', 'family'
+  const [currentScreen, setCurrentScreen] = useState('welcome') // 'welcome', 'memories', 'stories', 'family', 'pricing'
   const [selectedEmotion, setSelectedEmotion] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
@@ -1309,14 +1309,9 @@ function App() {
           </button>
         </div>
 
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '40px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-          }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '10px', color: '#333' }}>Pricing Plans</h2>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div>
+            <h2>Pricing Plans</h2>
             <p style={{ color: '#666', marginBottom: '40px', textAlign: 'center' }}>
               Choose the perfect plan for your family's memory preservation needs
             </p>
@@ -1325,7 +1320,7 @@ function App() {
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
               gap: '30px',
-              maxWidth: '1000px',
+              maxWidth: '900px',
               margin: '0 auto'
             }}>
               {/* Free Plan */}
@@ -1351,7 +1346,7 @@ function App() {
                   marginBottom: '30px'
                 }}>
                   <li style={{ padding: '8px 0', color: '#333' }}>✅ Up to 10 memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Basic AI story generation</li>
+                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Basic story creation</li>
                   <li style={{ padding: '8px 0', color: '#333' }}>✅ 2 family members</li>
                   <li style={{ padding: '8px 0', color: '#333' }}>✅ Voice search</li>
                 </ul>
@@ -1380,27 +1375,12 @@ function App() {
                 border: '2px solid #9C27B0',
                 position: 'relative'
               }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '-12px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: '#9C27B0',
-                  color: 'white',
-                  padding: '6px 20px',
-                  borderRadius: '20px',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}>
-                  MOST POPULAR
-                </div>
-                
                 <h3 style={{ color: '#9C27B0', marginBottom: '10px' }}>Premium</h3>
                 <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $9.99
+                  $4.99
                   <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
                 </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>For growing families</p>
+                <p style={{ color: '#666', marginBottom: '30px' }}>For active families</p>
                 
                 <ul style={{ 
                   listStyle: 'none', 
@@ -1409,11 +1389,10 @@ function App() {
                   marginBottom: '30px'
                 }}>
                   <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced AI story generation</li>
+                  <li style={{ padding: '8px 0', color: '#333' }}>✅ AI audio story narration</li>
                   <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited family members</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Voice search & commands</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Audio story narration</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain preservation</li>
+                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced voice commands</li>
+                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain verification</li>
                 </ul>
                 
                 <button style={{
@@ -1428,92 +1407,6 @@ function App() {
                 }}>
                   Upgrade Now
                 </button>
-              </div>
-
-              {/* Family Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                textAlign: 'center',
-                border: '2px solid #f0f0f0'
-              }}>
-                <h3 style={{ color: '#FF9800', marginBottom: '10px' }}>Family</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $19.99
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>For large families</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Everything in Premium</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Multiple family circles</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced sharing controls</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Priority support</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Custom story themes</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Export & backup tools</li>
-                </ul>
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#FF9800',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
-                }}>
-                  Choose Family
-                </button>
-              </div>
-            </div>
-
-            <div style={{ 
-              textAlign: 'center',
-              marginTop: '40px',
-              padding: '30px',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '12px',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-            }}>
-              <h3 style={{ color: '#333', marginBottom: '15px' }}>🔒 All Plans Include</h3>
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '20px',
-                marginTop: '20px'
-              }}>
-                <div>
-                  <strong style={{ color: '#4CAF50' }}>🔐 Secure Storage</strong>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 0 0' }}>
-                    End-to-end encryption
-                  </p>
-                </div>
-                <div>
-                  <strong style={{ color: '#2196F3' }}>☁️ Cloud Backup</strong>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 0 0' }}>
-                    Never lose your memories
-                  </p>
-                </div>
-                <div>
-                  <strong style={{ color: '#FF9800' }}>📱 Mobile Access</strong>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 0 0' }}>
-                    Access anywhere, anytime
-                  </p>
-                </div>
-                <div>
-                  <strong style={{ color: '#9C27B0' }}>🎯 AI Powered</strong>
-                  <p style={{ fontSize: '14px', color: '#666', margin: '5px 0 0 0' }}>
-                    Smart story generation
-                  </p>
-                </div>
               </div>
             </div>
           </div>
