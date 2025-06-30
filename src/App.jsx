@@ -1,656 +1,259 @@
-import { useState, useEffect, useRef } from 'react'
-import { createClient } from '@supabase/supabase-js'
-
-// Initialize Supabase client with your credentials
-const supabaseUrl = 'https://tzfvteccfyxfefwhmara.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6ZnZ0ZWNjZnl4ZmVmd2htYXJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEyNjUxMjUsImV4cCI6MjA2Njg0MTEyNX0.2V5VDPPGTxo4R-_s-e7eBUEc7MF8N0s-9zdsZpCNFgY'
-const supabase = createClient(supabaseUrl, supabaseKey)
+import React, { useState, useEffect, useRef } from 'react'
+import { supabase, authService, memoryService, storyService, familyService } from './lib/supabase'
 
 function App() {
-  // State Management
-  const [currentScreen, setCurrentScreen] = useState('welcome')
-  const [selectedEmotion, setSelectedEmotion] = useState(null)
+  // Authentication state
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [authMode, setAuthMode] = useState('signin') // 'signin' or 'signup'
+  
+  // Form states
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  
+  // App state
+  const [currentScreen, setCurrentScreen] = useState('welcome') // 'welcome', 'memories', 'stories', 'family'
+  const [selectedEmotion, setSelectedEmotion] = useState('')
   const [isRecording, setIsRecording] = useState(false)
-  const [memories, setMemories] = useState([])
-  const [shareLinks, setShareLinks] = useState({})
-  const [selectedMemories, setSelectedMemories] = useState([])
-  const [stories, setStories] = useState([])
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [familyMembers, setFamilyMembers] = useState([])
-  const [activeIntegration, setActiveIntegration] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  const [selectedPrompt, setSelectedPrompt] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
+  const [audioBlob, setAudioBlob] = useState(null)
+  const [transcript, setTranscript] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [memories, setMemories] = useState([])
+  const [stories, setStories] = useState([])
+  const [familyMembers, setFamilyMembers] = useState([])
+  const [selectedMemories, setSelectedMemories] = useState([])
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false)
+  const [newMemberEmail, setNewMemberEmail] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [voiceSearchActive, setVoiceSearchActive] = useState(false)
   const [voiceSearchResults, setVoiceSearchResults] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
   
   // Refs
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
 
-  // Emotion Configurations
-  const emotionGradients = {
-    happy: 'linear-gradient(135deg, #FFD93D 0%, #FFB84D 100%)',
-    sad: 'linear-gradient(135deg, #5C7CFA 0%, #4263EB 100%)',
-    grateful: 'linear-gradient(135deg, #8CE99A 0%, #51CF66 100%)',
-    excited: 'linear-gradient(135deg, #FF6B6B 0%, #F03E3E 100%)',
-    anxious: 'linear-gradient(135deg, #AA5FB4 0%, #8B3E9B 100%)',
-    proud: 'linear-gradient(135deg, #74C0FC 0%, #4C9AFF 100%)'
-  }
-
-  const emotionPrompts = {
-    happy: [
-      "What made you smile today?",
-      "Share a moment that filled you with joy",
-      "Describe a happy surprise you experienced"
-    ],
-    sad: [
-      "What's weighing on your heart?",
-      "Share a memory that brings tears",
-      "Talk about someone you miss"
-    ],
-    grateful: [
-      "What are you thankful for today?",
-      "Who made a difference in your life?",
-      "Describe a blessing you received"
-    ],
-    excited: [
-      "What's got you pumped up?",
-      "Share your biggest anticipation",
-      "What adventure awaits you?"
-    ],
-    anxious: [
-      "What's on your mind right now?",
-      "Share what's making you nervous",
-      "Talk through your worries"
-    ],
-    proud: [
-      "What achievement makes you proud?",
-      "Share a moment you overcame something",
-      "Describe your recent success"
-    ]
-  }
-
-  // Initialize Supabase Auth
+  // Initialize auth listener
   useEffect(() => {
-    let mounted = true
-
-    // Check for existing session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (mounted && session?.user) {
-          setCurrentUser(session.user)
-          await loadUserData(session.user.id)
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error)
-      } finally {
-        if (mounted) setIsLoading(false)
-      }
-    }
-
-    initializeAuth()
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (mounted) {
-        if (session?.user) {
-          setCurrentUser(session.user)
-          await loadUserData(session.user.id)
-        } else {
-          setCurrentUser(null)
-          setMemories([])
-          setStories([])
-          setFamilyMembers([])
-        }
-      }
+    const unsubscribe = authService.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
+    return unsubscribe
   }, [])
 
-  // Load user data from Supabase
-  const loadUserData = async (userId) => {
-    try {
-      // Load memories
-      const { data: memoriesData, error: memoriesError } = await supabase
-        .from('memories')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-      
-      if (!memoriesError && memoriesData) {
-        setMemories(memoriesData)
-      }
-
-      // Load stories
-      const { data: storiesData, error: storiesError } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-      
-      if (!storiesError && storiesData) {
-        setStories(storiesData)
-      }
-
-      // Load family members
-      const { data: familyData, error: familyError } = await supabase
-        .from('family_members')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-      
-      if (!familyError && familyData) {
-        setFamilyMembers(familyData)
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error)
+  // Load user data when authenticated
+  useEffect(() => {
+    if (user) {
+      loadUserData()
     }
+  }, [user])
+
+  const loadUserData = async () => {
+    if (!user) return
+    
+    const [memoriesData, storiesData, familyData] = await Promise.all([
+      memoryService.getMemories(user.id),
+      storyService.getStories(user.id),
+      familyService.getFamilyMembers(user.id)
+    ])
+    
+    setMemories(memoriesData)
+    setStories(storiesData)
+    setFamilyMembers(familyData)
   }
 
-  // Upload audio to Supabase Storage
-  const uploadAudio = async (audioBlob, type = 'memory') => {
-    if (!currentUser) return null
-
-    const fileName = `${currentUser.id}/${type}/${Date.now()}.webm`
+  // Authentication handlers
+  const handleAuth = async (e) => {
+    e.preventDefault()
+    setAuthError('')
     
     try {
-      // First, ensure the bucket exists
-      const { data, error } = await supabase.storage
-        .from('audio-recordings')
-        .upload(fileName, audioBlob, {
-          contentType: 'audio/webm',
-          upsert: false
-        })
-      
-      if (error) {
-        console.error('Upload error:', error)
-        // If bucket doesn't exist, show helpful message
-        if (error.message.includes('bucket')) {
-          alert('Please create "audio-recordings" bucket in Supabase Storage')
-        }
-        return null
+      let result
+      if (authMode === 'signup') {
+        result = await authService.signUp(email, password)
+      } else {
+        result = await authService.signIn(email, password)
       }
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('audio-recordings')
-        .getPublicUrl(fileName)
-      
-      return publicUrl
+      if (result.error) {
+        setAuthError(result.error.message)
+      }
     } catch (error) {
-      console.error('Upload error:', error)
-      return null
+      setAuthError('An unexpected error occurred')
     }
   }
 
-  // Transcription function with real OpenAI API
-  const transcribeAudio = async (audioBlob) => {
-    setIsTranscribing(true)
-    setActiveIntegration('🎙️ Transcribing with OpenAI Whisper...')
-    
-    try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY
-      
-      if (!apiKey) {
-        // Enhanced mock transcripts for demo
-        const mockTranscripts = {
-          happy: [
-            "Today was wonderful! I spent the afternoon with my grandchildren at the park. We fed the ducks and they laughed so much when one duck kept following us around. These are the moments I treasure most.",
-            "I got a surprise call from my old college roommate today! We haven't spoken in years but picked up right where we left off. It's amazing how true friendships never fade.",
-            "Made my famous chocolate chip cookies and the whole house smelled like heaven. My neighbor stopped by and we shared them over tea. Simple pleasures are the best."
-          ],
-          sad: [
-            "I've been thinking about Mom a lot today. It's been five years since she passed, but sometimes I still reach for the phone to call her. I miss our Sunday conversations.",
-            "Found Dad's old watch in the drawer today. He wore it every day for forty years. Holding it brings back so many memories of him teaching me to tell time.",
-            "The house feels so quiet now that the kids have all moved away. I'm proud of them, but I miss the chaos and laughter that used to fill these rooms."
-          ],
-          grateful: [
-            "My doctor gave me a clean bill of health today! After last year's scare, I don't take a single day for granted anymore. Every sunrise is a gift.",
-            "My granddaughter drew me a picture that says 'Best Grandma Ever.' It's going straight on the fridge. These little gestures mean the world to me.",
-            "Celebrated 45 years of marriage today. Through all the ups and downs, we've built a beautiful life together. I'm so grateful for my partner."
-          ],
-          excited: [
-            "Just booked tickets to visit my new grandson! I can't wait to hold him for the first time. Being a grandparent is the greatest joy.",
-            "Starting art classes next week! I've always wanted to paint, and finally decided it's never too late to learn something new.",
-            "The whole family is coming for Thanksgiving! It's been two years since we were all together. I'm already planning the menu."
-          ]
-        }
-        
-        const emotionTranscripts = mockTranscripts[selectedEmotion] || mockTranscripts.happy
-        const randomTranscript = emotionTranscripts[Math.floor(Math.random() * emotionTranscripts.length)]
-        
-        setTimeout(() => {
-          setIsTranscribing(false)
-          setActiveIntegration('')
-        }, 2000)
-        
-        return randomTranscript
-      }
-      
-      // Real OpenAI API implementation
-      const formData = new FormData()
-      formData.append('file', audioBlob, 'audio.webm')
-      formData.append('model', 'whisper-1')
-      formData.append('language', 'en')
-      
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: formData
-      })
-      
-      if (!response.ok) {
-        throw new Error('Transcription failed')
-      }
-      
-      const data = await response.json()
-      return data.text
-      
-    } catch (error) {
-      console.error('Transcription error:', error)
-      alert('Transcription failed. Please try again.')
-      return null
-    } finally {
-      setIsTranscribing(false)
-      setActiveIntegration('')
-    }
+  const handleSignOut = async () => {
+    await authService.signOut()
+    setCurrentScreen('welcome')
+    setSelectedEmotion('')
+    setTranscript('')
+    setAudioBlob(null)
+    setMemories([])
+    setStories([])
+    setFamilyMembers([])
   }
 
-  // Audio Recording Functions
+  // Recording functionality
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorderRef.current = new MediaRecorder(stream)
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
-      
-      mediaRecorderRef.current.ondataavailable = (event) => {
+
+      mediaRecorder.ondataavailable = (event) => {
         audioChunksRef.current.push(event.data)
       }
-      
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        
-        // Upload audio to Supabase Storage
-        const audioUrl = await uploadAudio(audioBlob, 'memory')
-        
-        if (!audioUrl) {
-          alert('Failed to upload audio. Please try again.')
-          return
-        }
-        
-        // Transcribe the audio
-        const transcript = await transcribeAudio(audioBlob)
-        
-        if (transcript && currentUser) {
-          // Save to Supabase database
-          const { data, error } = await supabase
-            .from('memories')
-            .insert([{
-              user_id: currentUser.id,
-              emotion: selectedEmotion,
-              transcript: transcript,
-              audio_url: audioUrl,
-              blockchain_tx: null // Will be added when blockchain integration is ready
-            }])
-            .select()
-            .single()
-          
-          if (error) {
-            console.error('Save error:', error)
-            alert('Failed to save memory. Please try again.')
-            return
-          }
-          
-          // Add to local state with themes
-          if (data) {
-            const memoryWithThemes = {
-              ...data,
-              mood: getMoodFromEmotion(selectedEmotion),
-              themes: getThemesFromTranscript(transcript)
-            }
-            setMemories([memoryWithThemes, ...memories])
-            setSuccessMessage('Memory Preserved! 🎉')
-            setTimeout(() => setSuccessMessage(''), 3000)
-            setCurrentScreen('memories')
-            
-            // Play success sound
-            playSound([261.63, 329.63, 392.00], 0.15) // C4-E4-G4
-          }
-        }
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+        setAudioBlob(audioBlob)
+        stream.getTracks().forEach(track => track.stop())
       }
-      
-      mediaRecorderRef.current.start()
+
+      mediaRecorder.start()
       setIsRecording(true)
-      
-      // Play start sound
-      playSound([261.63, 329.63], 0.1) // C4 to E4
-      
     } catch (error) {
-      console.error('Error accessing microphone:', error)
-      alert('Error accessing microphone. Please check permissions.')
+      console.error('Error starting recording:', error)
     }
   }
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
       setIsRecording(false)
-      
-      // Play stop sound
-      playSound([329.63, 261.63], 0.1) // E4 to C4
     }
   }
 
-  // Helper Functions
-  const getMoodFromEmotion = (emotion) => {
-    const moods = {
-      happy: 'Joyful',
-      sad: 'Melancholic',
-      grateful: 'Thankful',
-      excited: 'Energetic',
-      anxious: 'Worried',
-      proud: 'Accomplished'
-    }
-    return moods[emotion] || 'Reflective'
-  }
-
-  const getThemesFromTranscript = (transcript) => {
-    const themes = []
-    const lowerTranscript = transcript.toLowerCase()
+  // Transcription (mock implementation)
+  const transcribeAudio = async () => {
+    if (!audioBlob) return
     
-    if (lowerTranscript.includes('family') || lowerTranscript.includes('grandchild') || lowerTranscript.includes('daughter') || lowerTranscript.includes('son')) {
-      themes.push('Family')
-    }
-    if (lowerTranscript.includes('health') || lowerTranscript.includes('doctor') || lowerTranscript.includes('medicine')) {
-      themes.push('Health')
-    }
-    if (lowerTranscript.includes('friend') || lowerTranscript.includes('neighbor')) {
-      themes.push('Friendship')
-    }
-    if (lowerTranscript.includes('memory') || lowerTranscript.includes('remember') || lowerTranscript.includes('past')) {
-      themes.push('Nostalgia')
-    }
-    if (lowerTranscript.includes('grateful') || lowerTranscript.includes('thankful') || lowerTranscript.includes('blessed')) {
-      themes.push('Gratitude')
+    setIsTranscribing(true)
+    
+    // Mock transcription - in real app, you'd send to speech-to-text service
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    const mockTranscripts = {
+      happy: "Today was such a wonderful day! I spent time with my family at the park, and we had the most amazing picnic. The kids were laughing and playing, and I felt so grateful for these precious moments together.",
+      sad: "I've been thinking about grandma a lot today. She used to tell the most beautiful stories about her childhood. I miss her voice and her warm hugs. These memories are so precious to me.",
+      grateful: "I'm so thankful for all the love in my life. My family, my friends, even the small moments like morning coffee and sunset walks. Every day brings something to be grateful for.",
+      excited: "I can't contain my excitement! We're planning a family reunion next month, and everyone will be there. It's been years since we've all been together. I can already imagine all the stories we'll share!"
     }
     
-    return themes.length > 0 ? themes : ['Life Story']
+    setTranscript(mockTranscripts[selectedEmotion] || "This is a sample transcription of your recorded memory.")
+    setIsTranscribing(false)
   }
 
-  // Audio feedback function
-  const playSound = (frequencies, duration) => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    frequencies.forEach((freq, index) => {
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + index * duration)
-      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration)
-      
-      oscillator.start(audioContext.currentTime + index * duration)
-      oscillator.stop(audioContext.currentTime + (index + 1) * duration)
-    })
+  // Save memory to database
+  const saveMemory = async () => {
+    if (!user || !transcript || !selectedEmotion) return
+    
+    const memory = {
+      user_id: user.id,
+      emotion: selectedEmotion,
+      transcript: transcript,
+      audio_url: null // In real app, you'd upload audio file and store URL
+    }
+    
+    const savedMemory = await memoryService.saveMemory(memory)
+    if (savedMemory) {
+      setMemories(prev => [savedMemory, ...prev])
+      // Reset form
+      setSelectedEmotion('')
+      setTranscript('')
+      setAudioBlob(null)
+    }
   }
 
-  // Share Memory Function
-  const shareMemory = (memoryId) => {
-    const link = `https://mymemoryjar.com/share/${memoryId}`
-    setShareLinks({ ...shareLinks, [memoryId]: link })
-    navigator.clipboard.writeText(link)
-    setSuccessMessage('Shared Successfully! 💝')
-    setTimeout(() => setSuccessMessage(''), 3000)
-  }
-
-  // Generate Story Function with real GPT-4 API
+  // Story generation
   const generateStory = async () => {
-    setActiveIntegration('✨ Creating your audio story with AI...')
-    setIsGenerating(true)
+    if (selectedMemories.length === 0) return
     
-    try {
-      const selectedMems = memories.filter(m => selectedMemories.includes(m.id))
-      const emotions = selectedMems.map(m => m.emotion).join(' and ')
-      
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY
-      
-      let storyText = ''
-      
-      if (!apiKey) {
-        // Enhanced mock story generation for demo
-        const memoryTexts = selectedMems.map(m => m.transcript).join(' ')
-        const hasGrandchildren = memoryTexts.toLowerCase().includes('grandchild')
-        const hasFamily = memoryTexts.toLowerCase().includes('family')
-        const hasHealth = memoryTexts.toLowerCase().includes('health')
-        
-        if (hasGrandchildren) {
-          storyText = `In the tapestry of life, few threads shine as brightly as the moments shared between generations. Your ${emotions} memories paint a portrait of a life enriched by the laughter of grandchildren and the wisdom of years well-lived. From park adventures with curious ducks to the sweet aroma of homemade cookies, these stories remind us that joy often comes in the simplest packages. Each memory is a gift, carefully wrapped in love and tied with ribbons of time, waiting to be opened by future generations who will treasure these glimpses into a life fully lived.`
-        } else if (hasFamily) {
-          storyText = `Family is the heart's true home, and your ${emotions} memories capture the essence of what it means to belong. Through celebrations and quiet moments, through presence and absence, the bonds of family weave through every story. The empty chair that once held laughter, the phone that no longer rings with familiar voices - these absences make the remaining connections all the more precious. Your stories remind us that family isn't just about blood; it's about the people who show up, who remember, who care.`
-        } else if (hasHealth) {
-          storyText = `Health is the silent foundation upon which all other joys are built. Your ${emotions} memories reflect the profound gratitude that comes from understanding this truth. Each clear medical report, each sunrise witnessed, each day free from pain becomes a celebration. These stories teach us that wellness isn't just about the body - it's about the spirit that chooses gratitude, the mind that finds peace, and the heart that keeps loving despite life's challenges.`
-        } else {
-          storyText = `Life is a collection of moments, and your ${emotions} memories have captured some of the most precious ones. From unexpected phone calls that bridge years of silence to the quiet contemplation of treasured possessions, each story adds another brushstroke to the masterpiece of your life. These memories remind us that every day holds the potential for connection, for gratitude, for love. They show us that a life well-lived isn't measured in grand gestures, but in the accumulation of small, meaningful moments that touch the heart and nurture the soul.`
-        }
-      } else {
-        // Real GPT-4 API call
-        const prompt = `Create a beautiful, cohesive narrative that weaves together these ${emotions} family memories into a meaningful story. The story should be warm, reflective, and suitable for sharing with family. Here are the memories:\n\n${selectedMems.map(m => m.transcript).join('\n\n')}\n\nCreate a story that honors these memories and captures their emotional essence.`
-        
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a compassionate storyteller who creates beautiful narratives from family memories. Your stories are warm, meaningful, and perfect for preserving family history.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            temperature: 0.8,
-            max_tokens: 500
-          })
-        })
-        
-        if (!response.ok) {
-          throw new Error('Story generation failed')
-        }
-        
-        const data = await response.json()
-        storyText = data.choices[0].message.content
-      }
-      
-      // Save story to Supabase
-      const storyData = {
-        user_id: currentUser.id,
-        memory_ids: selectedMems.map(m => m.id),
-        story_text: storyText,
-        audio_url: null // Will be set after audio generation
-      }
-      
-      const { data: savedStory, error } = await supabase
-        .from('stories')
-        .insert([storyData])
-        .select()
-        .single()
-      
-      if (error) {
-        console.error('Error saving story:', error)
-        alert('Failed to save story. Please try again.')
-        return
-      }
-      
-      const newStory = {
-        ...savedStory,
-        title: `A ${emotions} family story`,
-        memories: selectedMems
-      }
-      
-      setStories([newStory, ...stories])
+    setIsGeneratingStory(true)
+    
+    // Mock story generation - in real app, you'd call AI service
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
+    const storyText = `Once upon a time, there were beautiful moments that shaped a family's journey together. ${selectedMemoryData.map(m => m.transcript).join(' ')} These memories, woven together, tell the story of love, growth, and the precious bonds that connect us all.`
+    
+    const story = {
+      user_id: user.id,
+      memory_ids: selectedMemories,
+      story_text: storyText,
+      audio_url: null // In real app, you'd generate audio narration
+    }
+    
+    const savedStory = await storyService.saveStory(story)
+    if (savedStory) {
+      setStories(prev => [savedStory, ...prev])
       setSelectedMemories([])
-      setSuccessMessage('Story Created! ✨')
-      setTimeout(() => setSuccessMessage(''), 3000)
-      
-    } catch (error) {
-      console.error('Story generation error:', error)
-      alert('Story generation failed. Please try again.')
-    } finally {
-      setIsGenerating(false)
-      setActiveIntegration('')
     }
-  }
-
-  // Generate Audio Narration with ElevenLabs
-  const generateAudioNarration = async (story) => {
-    setActiveIntegration('🎭 Generating audio with ElevenLabs...')
     
-    try {
-      const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY
-      
-      if (!apiKey) {
-        // Create realistic mock audio
-        setTimeout(async () => {
-          // Create a mock audio blob
-          const mockAudioData = new Uint8Array(44100 * 2 * 10) // 10 seconds of silence
-          const audioBlob = new Blob([mockAudioData], { type: 'audio/mpeg' })
-          
-          // Upload to Supabase
-          const audioUrl = await uploadAudio(audioBlob, 'story')
-          
-          if (audioUrl) {
-            // Update story with audio URL
-            const { error } = await supabase
-              .from('stories')
-              .update({ audio_url: audioUrl })
-              .eq('id', story.id)
-            
-            if (!error) {
-              // Update local state
-              setStories(stories.map(s => 
-                s.id === story.id ? { ...s, audio_url: audioUrl } : s
-              ))
-              
-              setSuccessMessage('Audio narration created! 🎭')
-              setTimeout(() => setSuccessMessage(''), 3000)
-            }
-          }
-          
-          setActiveIntegration('')
-        }, 3000)
-        return
-      }
-      
-      // Real ElevenLabs API call
-      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': apiKey
-        },
-        body: JSON.stringify({
-          text: story.story_text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5
-          }
-        })
-      })
-      
-      if (response.ok) {
-        const audioBlob = await response.blob()
-        const audioUrl = await uploadAudio(audioBlob, 'story')
-        
-        if (audioUrl) {
-          // Update story with audio URL
-          const { error } = await supabase
-            .from('stories')
-            .update({ audio_url: audioUrl })
-            .eq('id', story.id)
-          
-          if (!error) {
-            setStories(stories.map(s => 
-              s.id === story.id ? { ...s, audio_url: audioUrl } : s
-            ))
-            
-            setSuccessMessage('Audio narration created! 🎭')
-            setTimeout(() => setSuccessMessage(''), 3000)
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error('Audio generation error:', error)
-      alert('Audio generation failed. Please try again.')
-    } finally {
-      setActiveIntegration('')
+    setIsGeneratingStory(false)
+  }
+
+  // Family member management
+  const addFamilyMember = async (e) => {
+    e.preventDefault()
+    if (!user || !newMemberEmail) return
+    
+    const member = await familyService.addFamilyMember(user.id, newMemberEmail)
+    if (member) {
+      setFamilyMembers(prev => [member, ...prev])
+      setNewMemberEmail('')
     }
   }
 
-  // Voice Search Function
+  const updateMemberAccess = async (memberId, accessLevel) => {
+    const updated = await familyService.updateFamilyMemberAccess(memberId, accessLevel)
+    if (updated) {
+      setFamilyMembers(prev => 
+        prev.map(m => m.id === memberId ? { ...m, access_level: accessLevel } : m)
+      )
+    }
+  }
+
   const startVoiceSearch = () => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice search is only supported in Chrome or Edge browsers.')
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice search is not supported in your browser. Try Chrome or Edge.')
       return
     }
     
-    const recognition = new window.webkitSpeechRecognition()
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    
     recognition.continuous = false
     recognition.interimResults = false
     recognition.lang = 'en-US'
     
-    setIsListening(true)
-    setVoiceSearchActive(true)
-    setVoiceSearchResults([])
+    recognition.onstart = () => {
+      setIsListening(true)
+      setVoiceSearchActive(true)
+      setVoiceSearchResults([])
+    }
     
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript.toLowerCase()
-      console.log('Voice search:', transcript)
       
-      // Search through memories
-      const results = memories.filter(memory => {
-        const matchesTranscript = memory.transcript.toLowerCase().includes(transcript)
-        const matchesEmotion = transcript.includes(memory.emotion)
-        const matchesMood = memory.mood && transcript.includes(memory.mood.toLowerCase())
-        return matchesTranscript || matchesEmotion || matchesMood
-      })
+      const results = memories.filter(memory => 
+        memory.transcript.toLowerCase().includes(transcript) ||
+        memory.emotion.toLowerCase().includes(transcript)
+      )
       
       setVoiceSearchResults(results)
-      setIsListening(false)
       
-      // Auto-play if user says "play" and there's only one result
-      if (transcript.includes('play') && results.length === 1) {
+      if (results.length === 1 && transcript.includes('play')) {
         const audio = new Audio(results[0].audio_url)
         audio.play()
       }
     }
     
-    recognition.onerror = (event) => {
-      console.error('Voice search error:', event.error)
+    recognition.onerror = () => {
       setIsListening(false)
       alert('Voice search failed. Please try again.')
     }
@@ -662,1678 +265,1200 @@ function App() {
     recognition.start()
   }
 
-  // Add Family Member
-  const addFamilyMember = async (name, email, access) => {
-    if (!currentUser) return
-
-    try {
-      const { data, error } = await supabase
-        .from('family_members')
-        .insert([{
-          user_id: currentUser.id,
-          member_email: email,
-          access_level: access || 'selected'
-        }])
-        .select()
-        .single()
-      
-      if (error) {
-        console.error('Error adding family member:', error)
-        alert('Failed to add family member. Please try again.')
-        return
-      }
-      
-      if (data) {
-        // Add name to the data for display
-        const memberWithName = { ...data, name }
-        setFamilyMembers([...familyMembers, memberWithName])
-        setSuccessMessage('Family member invited! 💌')
-        setTimeout(() => setSuccessMessage(''), 3000)
-      }
-    } catch (error) {
-      console.error('Error adding family member:', error)
-    }
-  }
-
-  // Check if user has premium (based on memory count for demo)
-  const isPremium = () => {
-    return memories.length < 10 || currentUser?.user_metadata?.isPremium
-  }
-
-  // Loading screen
-  if (isLoading) {
+  // Loading state
+  if (loading) {
     return (
       <div style={{ 
+        minHeight: '100vh', 
         display: 'flex', 
-        justifyContent: 'center', 
         alignItems: 'center', 
-        height: '100vh',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '50px',
-            height: '50px',
-            border: '3px solid #ddd',
-            borderTop: '3px solid #4CAF50',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px'
-          }}></div>
-          <p>Loading your memories...</p>
+        <div style={{ color: 'white', fontSize: '18px' }}>Loading...</div>
+      </div>
+    )
+  }
+
+  // Authentication screen
+  if (!user) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '20px',
+          padding: '40px',
+          maxWidth: '400px',
+          width: '100%',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+          padding: '0 20px'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px', padding: '40px 20px 0' }}>
+            <h1 style={{ 
+              fontSize: '28px', 
+              fontWeight: 'bold', 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              marginBottom: '10px'
+            }}>
+              Memory Jar
+            </h1>
+            <p style={{ color: '#666', fontSize: '16px' }}>
+              {authMode === 'signin' ? 'Welcome back!' : 'Create your account'}
+            </p>
+          </div>
+
+          <div style={{ padding: '0 20px 40px' }}>
+            <form onSubmit={handleAuth}>
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e1e5e9',
+                    borderRadius: '10px',
+                    fontSize: '16px',
+                    outline: 'none',
+                    transition: 'border-color 0.3s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e1e5e9',
+                    borderRadius: '10px',
+                    fontSize: '16px',
+                    outline: 'none',
+                    transition: 'border-color 0.3s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                />
+              </div>
+
+              {authError && (
+                <div style={{ 
+                  color: '#e74c3c', 
+                  marginBottom: '20px', 
+                  padding: '10px',
+                  backgroundColor: '#fdf2f2',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}>
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  marginBottom: '15px',
+                  boxSizing: 'border-box'
+                }}
+                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
+              </button>
+
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    textDecoration: 'underline',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  {authMode === 'signin' 
+                    ? "Don't have an account? Sign up" 
+                    : "Already have an account? Sign in"
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     )
   }
 
-  // Render UI
-  return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <style>{`
-        @keyframes slideDown {
-          from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
-          to { transform: translateX(-50%) translateY(0); opacity: 1; }
-        }
-        @keyframes pulse {
-          0% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.1); opacity: 0.8; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes float {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-          100% { transform: translateY(0px); }
-        }
-        @keyframes gentlePulse {
-          0% { opacity: 0.6; }
-          50% { opacity: 1; }
-          100% { opacity: 0.6; }
-        }
-        @keyframes ripple {
-          0% { transform: scale(0.95); opacity: 0.7; }
-          50% { transform: scale(1.02); opacity: 0.3; }
-          100% { transform: scale(0.95); opacity: 0.7; }
-        }
-      `}</style>
-
-      {/* Header with Modern Navigation */}
+  // Welcome screen
+  if (currentScreen === 'welcome') {
+    return (
       <div style={{ 
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid #eee',
-        zIndex: 100,
-        padding: '15px 20px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.08)'
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
       }}>
+        {/* Header */}
         <div style={{ 
-          maxWidth: '800px', 
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '40px'
         }}>
-          <h2 style={{ margin: 0, fontSize: '24px', color: '#333' }}>
-            <span style={{ fontSize: '28px', marginRight: '10px' }}>🏺</span>
-            My Memory Jar
-          </h2>
-          
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {currentUser && (
-              <>
-                <button
-                  onClick={() => setCurrentScreen('welcome')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'welcome' ? '#4CAF50' : 'transparent',
-                    color: currentScreen === 'welcome' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'welcome' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'welcome' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => setCurrentScreen('record')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'record' ? '#4CAF50' : 'transparent',
-                    color: currentScreen === 'record' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'record' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'record' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Record
-                </button>
-                <button
-                  onClick={() => setCurrentScreen('memories')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'memories' ? '#4CAF50' : 'transparent',
-                    color: currentScreen === 'memories' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'memories' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'memories' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Memories
-                </button>
-                <button
-                  onClick={() => setCurrentScreen('stories')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'stories' ? '#4CAF50' : 'transparent',
-                    color: currentScreen === 'stories' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'stories' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'stories' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Stories
-                </button>
-                <button
-                  onClick={() => setCurrentScreen('family')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'family' ? '#4CAF50' : 'transparent',
-                    color: currentScreen === 'family' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'family' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'family' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Family
-                </button>
-                <button
-                  onClick={() => setCurrentScreen('pricing')}
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: currentScreen === 'pricing' ? '#9C27B0' : 'transparent',
-                    color: currentScreen === 'pricing' ? 'white' : '#555',
-                    border: 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: currentScreen === 'pricing' ? '600' : '500',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = '#f5f5f5')}
-                  onMouseLeave={(e) => currentScreen !== 'pricing' && (e.target.style.backgroundColor = 'transparent')}
-                >
-                  Pricing
-                </button>
-                
-                <button
-                  onClick={async () => {
-                    await supabase.auth.signOut()
-                    setCurrentScreen('welcome')
-                  }}
-                  style={{
-                    padding: '6px 16px',
-                    backgroundColor: 'transparent',
-                    color: '#ff4444',
-                    border: '1px solid #ff4444',
-                    borderRadius: '15px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease',
-                    marginLeft: '10px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#ff4444'
-                    e.target.style.color = 'white'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent'
-                    e.target.style.color = '#ff4444'
-                  }}
-                >
-                  Sign Out
-                </button>
-              </>
-            )}
+          <h1 style={{ 
+            color: 'white', 
+            fontSize: '24px', 
+            fontWeight: 'bold',
+            margin: 0
+          }}>
+            Memory Jar
+          </h1>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+
+        {/* Welcome Content */}
+        <div style={{
+          maxWidth: '800px',
+          margin: '0 auto',
+          textAlign: 'center',
+          color: 'white'
+        }}>
+          <div style={{ marginBottom: '40px' }}>
+            <h2 style={{ 
+              fontSize: '48px', 
+              fontWeight: 'bold', 
+              marginBottom: '20px',
+              lineHeight: '1.2'
+            }}>
+              Welcome to Your Digital Memory Jar
+            </h2>
+            <p style={{ 
+              fontSize: '20px', 
+              opacity: 0.9, 
+              lineHeight: '1.6',
+              marginBottom: '20px'
+            }}>
+              Transform precious moments into lasting digital treasures. Record stories 
+              while you can, preserve them forever, and share them with loved ones.
+            </p>
+            <div style={{ 
+              marginTop: '20px', 
+              padding: '15px', 
+              backgroundColor: '#fff3cd', 
+              borderRadius: '8px',
+              borderLeft: '4px solid #ffc107'
+            }}>
+              <strong style={{ color: '#856404' }}>⏰ Don't wait:</strong>
+              <span style={{ color: '#856404', marginLeft: '5px' }}>
+                The average family has less than 5 minutes of recorded voices. Start preserving today.
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '20px' }}>
+            <div style={{ 
+              background: 'rgba(255,255,255,0.1)', 
+              padding: '20px', 
+              borderRadius: '15px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: '24px', marginBottom: '10px' }}>🎙️</div>
+              <h3 style={{ fontSize: '18px', marginBottom: '10px' }}>Record Memories</h3>
+              <p style={{ fontSize: '14px', opacity: 0.8 }}>Capture precious moments with voice recordings</p>
+            </div>
+            <div style={{ 
+              background: 'rgba(255,255,255,0.1)', 
+              padding: '20px', 
+              borderRadius: '15px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: '24px', marginBottom: '10px' }}>📖</div>
+              <h3 style={{ fontSize: '18px', marginBottom: '10px' }}>Create Stories</h3>
+              <p style={{ fontSize: '14px', opacity: 0.8 }}>AI weaves your memories into beautiful narratives</p>
+            </div>
+          </div>
+
+          <div style={{ 
+            marginTop: '30px', 
+            padding: '20px', 
+            background: 'rgba(255,255,255,0.1)', 
+            borderRadius: '15px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <p style={{ fontSize: '16px', marginBottom: '15px' }}>
+              <strong>How it works:</strong> Choose an emotion → Record your story → AI transcribes → Create audio story narratives → Share with family
+            </p>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(3, 1fr)', 
+            gap: '20px', 
+            marginTop: '40px' 
+          }}>
+            <button
+              onClick={() => setCurrentScreen('memories')}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '20px',
+                borderRadius: '15px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => e.target.style.transform = 'translateY(-5px)'}
+              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              🎙️ Record Memories
+            </button>
+            <button
+              onClick={() => setCurrentScreen('stories')}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '20px',
+                borderRadius: '15px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => e.target.style.transform = 'translateY(-5px)'}
+              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              📖 View Stories
+            </button>
+            <button
+              onClick={() => setCurrentScreen('family')}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '20px',
+                borderRadius: '15px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => e.target.style.transform = 'translateY(-5px)'}
+              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              👨‍👩‍👧‍👦 Family Circle
+            </button>
           </div>
         </div>
       </div>
+    )
+  }
 
-      {/* Success Message */}
-      {successMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: '#4CAF50',
-          color: 'white',
-          padding: '15px 30px',
-          borderRadius: '25px',
-          boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
-          zIndex: 300,
-          fontSize: '16px',
-          animation: 'slideDown 0.3s ease-out'
-        }}>
-          {successMessage}
-        </div>
-      )}
-
-      {/* Active Integration Overlay */}
-      {activeIntegration && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          justifyContent: 'center',
+  // Memories screen
+  if (currentScreen === 'memories') {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
+        {/* Header */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
           alignItems: 'center',
-          zIndex: 1000
+          marginBottom: '30px'
         }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '40px',
-            borderRadius: '12px',
-            textAlign: 'center',
-            maxWidth: '400px'
+          <button
+            onClick={() => setCurrentScreen('welcome')}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ← Back
+          </button>
+          <h1 style={{ 
+            color: 'white', 
+            fontSize: '24px', 
+            fontWeight: 'bold',
+            margin: 0
           }}>
-            <div style={{
-              width: '50px',
-              height: '50px',
-              border: '3px solid #ddd',
-              borderTop: '3px solid #4CAF50',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p style={{ fontSize: '18px', fontWeight: 'bold' }}>{activeIntegration}</p>
-          </div>
+            Record Memories
+          </h1>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Sign Out
+          </button>
         </div>
-      )}
 
-      <div style={{ marginTop: '80px' }}>
-        {/* Welcome Screen */}
-        {currentScreen === 'welcome' && (
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#333' }}>My Memory Jar</h1>
-            <p style={{ fontSize: '24px', color: '#666', marginBottom: '40px' }}>
-              Hold to remember, share to live on.
-            </p>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          {/* Recording Interface */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            marginBottom: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Share a Memory</h2>
             
-            {currentUser ? (
-              <>
-                <p style={{ fontSize: '18px', color: '#4CAF50', marginBottom: '30px' }}>
-                  Welcome back! You have {memories.length} stories preserved with love
-                </p>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '15px',
-                  maxWidth: '600px',
-                  margin: '0 auto 40px'
-                }}>
-                  {Object.entries(emotionGradients).map(([emotion, gradient]) => (
+            {/* Emotion Selection */}
+            {!selectedEmotion && (
+              <div>
+                <p style={{ marginBottom: '20px', color: '#666' }}>How are you feeling about this memory?</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
+                  {[
+                    { emotion: 'happy', emoji: '😊', label: 'Happy' },
+                    { emotion: 'sad', emoji: '😢', label: 'Sad' },
+                    { emotion: 'grateful', emoji: '🙏', label: 'Grateful' },
+                    { emotion: 'excited', emoji: '🎉', label: 'Excited' }
+                  ].map(({ emotion, emoji, label }) => (
                     <button
                       key={emotion}
-                      onClick={() => {
-                        if (!isPremium()) {
-                          alert('Upgrade to Premium for unlimited memories! 🌟')
-                          setCurrentScreen('pricing')
-                          return
-                        }
-                        setSelectedEmotion(emotion)
-                        setCurrentScreen('record')
-                      }}
+                      onClick={() => setSelectedEmotion(emotion)}
                       style={{
-                        padding: '30px 20px',
-                        background: gradient,
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '2px solid #e1e5e9',
+                        borderRadius: '15px',
+                        background: 'white',
                         cursor: 'pointer',
                         fontSize: '16px',
-                        fontWeight: 'bold',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-                        transform: 'translateY(0)',
-                        transition: 'all 0.3s ease',
-                        textTransform: 'capitalize',
-                        opacity: !isPremium() ? 0.6 : 1
+                        transition: 'all 0.3s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-5px)'
-                        e.target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)'
+                      onMouseOver={(e) => {
+                        e.target.style.borderColor = '#667eea'
+                        e.target.style.transform = 'translateY(-2px)'
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseOut={(e) => {
+                        e.target.style.borderColor = '#e1e5e9'
                         e.target.style.transform = 'translateY(0)'
-                        e.target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)'
                       }}
                     >
-                      {emotion === 'happy' && '😊'}
-                      {emotion === 'sad' && '😢'}
-                      {emotion === 'grateful' && '🙏'}
-                      {emotion === 'excited' && '🎉'}
-                      {emotion === 'anxious' && '😰'}
-                      {emotion === 'proud' && '🏆'}
-                      <br />
-                      {emotion}
+                      <span style={{ fontSize: '24px' }}>{emoji}</span>
+                      <span>{label}</span>
                     </button>
                   ))}
-                </div>
-                
-                <div style={{ 
-                  background: '#f8f9fa',
-                  padding: '30px',
-                  borderRadius: '16px',
-                  marginTop: '40px'
-                }}>
-                  <h3 style={{ marginBottom: '20px' }}>How It Works</h3>
-                  <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '20px' }}>
-                    <div style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎙️</div>
-                      <p style={{ fontWeight: 'bold' }}>Tap & Speak</p>
-                      <p style={{ fontSize: '14px', color: '#666' }}>Choose emotion, record memory</p>
-                    </div>
-                    <div style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>✨</div>
-                      <p style={{ fontWeight: 'bold' }}>AI Transcribes</p>
-                      <p style={{ fontSize: '14px', color: '#666' }}>Transform into audio story narratives</p>
-                    </div>
-                    <div style={{ textAlign: 'center', flex: '1', minWidth: '150px' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>💝</div>
-                      <p style={{ fontWeight: 'bold' }}>Share Forever</p>
-                      <p style={{ fontSize: '14px', color: '#666' }}>One-click sharing with family</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-                <div style={{ 
-                  background: '#f8f9fa',
-                  padding: '30px',
-                  borderRadius: '16px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ marginBottom: '20px' }}>Sign In or Sign Up</h3>
-                  
-                  <form onSubmit={async (e) => {
-                    e.preventDefault()
-                    const email = e.target.email.value
-                    const password = e.target.password.value
-                    const isSignUp = e.submitter.name === 'signup'
-                    
-                    setActiveIntegration(isSignUp ? '🔐 Creating account...' : '🔐 Signing in...')
-                    
-                    try {
-                      if (isSignUp) {
-                        const { error } = await supabase.auth.signUp({
-                          email,
-                          password,
-                          options: {
-                            emailRedirectTo: window.location.origin
-                          }
-                        })
-                        if (error) throw error
-                        alert('Check your email for confirmation link!')
-                      } else {
-                        const { error } = await supabase.auth.signInWithPassword({
-                          email,
-                          password,
-                        })
-                        if (error) throw error
-                      }
-                    } catch (error) {
-                      alert(error.message)
-                    } finally {
-                      setActiveIntegration('')
-                    }
-                  }}>
-                    <input
-                      type="email"
-                      name="email"
-                      placeholder="Email"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        marginBottom: '10px',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '16px'
-                      }}
-                    />
-                    <input
-                      type="password"
-                      name="password"
-                      placeholder="Password (min 6 characters)"
-                      required
-                      minLength={6}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        marginBottom: '20px',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        fontSize: '16px'
-                      }}
-                    />
-                    <button 
-                      type="submit"
-                      name="signin"
-                      style={{
-                        width: '100%',
-                        padding: '15px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        marginBottom: '10px'
-                      }}
-                    >
-                      Sign In
-                    </button>
-                    <button 
-                      type="submit"
-                      name="signup"
-                      style={{
-                        width: '100%',
-                        padding: '15px',
-                        backgroundColor: '#2196F3',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Sign Up
-                    </button>
-                  </form>
-                  <p style={{ fontSize: '14px', color: '#666', marginTop: '15px' }}>
-                    Sign up to start preserving your memories
-                  </p>
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Record Screen */}
-        {currentScreen === 'record' && selectedEmotion && currentUser && (
-          <div style={{ 
-            padding: '40px 20px',
-            textAlign: 'center',
-            background: emotionGradients[selectedEmotion],
-            minHeight: 'calc(100vh - 120px)',
-            borderRadius: '20px',
-            color: 'white'
-          }}>
-            <h2 style={{ fontSize: '36px', marginBottom: '20px' }}>
-              Feeling {selectedEmotion}
-            </h2>
-            
-            {!selectedPrompt ? (
-              <div>
-                <p style={{ fontSize: '20px', marginBottom: '30px', opacity: 0.9 }}>
-                  Choose a prompt or record freely:
+            {/* Recording Controls */}
+            {selectedEmotion && !transcript && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ marginBottom: '20px', color: '#666' }}>
+                  Selected emotion: <strong style={{ color: '#667eea' }}>
+                    {selectedEmotion.charAt(0).toUpperCase() + selectedEmotion.slice(1)}
+                  </strong>
                 </p>
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '15px',
-                  maxWidth: '500px',
-                  margin: '0 auto'
-                }}>
-                  {emotionPrompts[selectedEmotion].map((prompt, index) => (
+                
+                {!audioBlob && (
+                  <div>
                     <button
-                      key={index}
-                      onClick={() => setSelectedPrompt(prompt)}
+                      onClick={isRecording ? stopRecording : startRecording}
                       style={{
-                        padding: '20px',
-                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        width: '120px',
+                        height: '120px',
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: isRecording 
+                          ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
+                          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: 'white',
-                        border: '2px solid rgba(255,255,255,0.3)',
-                        borderRadius: '12px',
-                        fontSize: '16px',
+                        fontSize: '24px',
                         cursor: 'pointer',
-                        backdropFilter: 'blur(10px)',
-                        transition: 'all 0.3s ease'
+                        transition: 'transform 0.2s',
+                        marginBottom: '20px'
                       }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'
-                        e.target.style.transform = 'translateY(-2px)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'
-                        e.target.style.transform = 'translateY(0)'
-                      }}
+                      onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                      onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                     >
-                      {prompt}
+                      {isRecording ? '⏹️' : '🎙️'}
                     </button>
-                  ))}
+                    <p style={{ color: '#666' }}>
+                      {isRecording ? 'Recording... Click to stop' : 'Click to start recording'}
+                    </p>
+                  </div>
+                )}
+
+                {audioBlob && (
+                  <div>
+                    <div style={{ marginBottom: '20px' }}>
+                      <audio controls style={{ width: '100%' }}>
+                        <source src={URL.createObjectURL(audioBlob)} type="audio/wav" />
+                      </audio>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                      <button
+                        onClick={transcribeAudio}
+                        disabled={isTranscribing}
+                        style={{
+                          padding: '12px 24px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '25px',
+                          cursor: isTranscribing ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          opacity: isTranscribing ? 0.7 : 1
+                        }}
+                      >
+                        {isTranscribing ? 'Transcribing...' : 'Transcribe'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAudioBlob(null)
+                          setSelectedEmotion('')
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          background: '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '25px',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        Start Over
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Transcript Review */}
+            {transcript && (
+              <div>
+                <h3 style={{ marginBottom: '15px', color: '#333' }}>Review Your Memory</h3>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  marginBottom: '20px',
+                  border: '1px solid #e1e5e9'
+                }}>
+                  <p style={{ lineHeight: '1.6', color: '#333', margin: 0 }}>
+                    {transcript}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                   <button
-                    onClick={() => setSelectedPrompt('free')}
+                    onClick={saveMemory}
                     style={{
-                      padding: '20px',
-                      backgroundColor: 'rgba(255,255,255,0.3)',
+                      padding: '12px 24px',
+                      background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                       color: 'white',
-                      border: '2px solid rgba(255,255,255,0.4)',
-                      borderRadius: '12px',
-                      fontSize: '16px',
-                      fontWeight: 'bold',
+                      border: 'none',
+                      borderRadius: '25px',
                       cursor: 'pointer',
-                      backdropFilter: 'blur(10px)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = 'rgba(255,255,255,0.4)'
-                      e.target.style.transform = 'translateY(-2px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'
-                      e.target.style.transform = 'translateY(0)'
+                      fontSize: '14px',
+                      fontWeight: 'bold'
                     }}
                   >
-                    🎙️ Record Freely
+                    Save Memory
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTranscript('')
+                      setAudioBlob(null)
+                      setSelectedEmotion('')
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '25px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Start Over
                   </button>
                 </div>
               </div>
-            ) : (
-              <div>
-                {selectedPrompt !== 'free' && (
-                  <p style={{ fontSize: '24px', marginBottom: '40px', opacity: 0.9 }}>
-                    "{selectedPrompt}"
-                  </p>
-                )}
-                
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  style={{
-                    width: '150px',
-                    height: '150px',
-                    borderRadius: '50%',
-                    backgroundColor: isRecording ? '#ff4444' : 'rgba(255,255,255,0.9)',
-                    color: isRecording ? 'white' : '#333',
-                    border: 'none',
-                    fontSize: '60px',
-                    cursor: 'pointer',
-                    boxShadow: '0 8px 25px rgba(0,0,0,0.2)',
-                    transition: 'all 0.3s ease',
-                    animation: isRecording ? 'pulse 1.5s infinite' : 'none'
-                  }}
-                >
-                  {isRecording ? '⏹️' : '🎙️'}
-                </button>
-                
-                <p style={{ marginTop: '20px', fontSize: '18px', opacity: 0.9 }}>
-                  {isRecording ? 'Tap to stop recording' : 'Tap to start recording'}
-                </p>
-                
-                {isTranscribing && (
-                  <div style={{ marginTop: '30px' }}>
-                    <div style={{ fontSize: '30px', animation: 'pulse 1.5s infinite' }}>
-                      🎙️
-                    </div>
-                    <p>Transcribing your memory...</p>
-                  </div>
-                )}
-                
-                <button
-                  onClick={() => {
-                    setSelectedPrompt(null)
-                    setSelectedEmotion(null)
-                    setCurrentScreen('welcome')
-                  }}
-                  style={{
-                    marginTop: '40px',
-                    padding: '10px 20px',
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ← Back
-                </button>
-              </div>
             )}
           </div>
-        )}
 
-        {/* Memories Screen */}
-        {currentScreen === 'memories' && currentUser && (
-          <div style={{ padding: '40px 20px' }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
-              Your Memory Collection
-            </h2>
-            
+          {/* Saved Memories */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Memories</h2>
             {/* Voice Search */}
             <div style={{ 
               marginBottom: '30px',
               padding: '20px',
-              background: '#f8f9fa',
-              borderRadius: '16px',
-              textAlign: 'center'
+              backgroundColor: '#f0f8ff',
+              borderRadius: '12px',
+              border: '2px dashed #2196F3'
             }}>
-              <h3 style={{ marginBottom: '15px' }}>🔍 Voice Search</h3>
-              <button
-                onClick={startVoiceSearch}
-                disabled={isListening}
-                style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  backgroundColor: isListening ? '#ff4444' : '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: isListening ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                  animation: isListening ? 'pulse 1.5s infinite' : 'none'
-                }}
-              >
-                🎤
-              </button>
-              <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-                {isListening ? 'Listening...' : 'Say "play grandma\'s story" or "show happy memories"'}
-              </p>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: '15px'
+              }}>
+                <div>
+                  <h3 style={{ margin: '0 0 5px 0' }}>🎤 Voice Search</h3>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                    Try saying: "Play grandpa's war story" or "Show happy memories"
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (isListening) {
+                      setIsListening(false)
+                      setVoiceSearchActive(false)
+                    } else {
+                      startVoiceSearch()
+                    }
+                  }}
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    borderRadius: '50%',
+                    backgroundColor: isListening ? '#ff4444' : '#2196F3',
+                    color: 'white',
+                    border: 'none',
+                    fontSize: '28px',
+                    cursor: 'pointer',
+                    boxShadow: isListening 
+                      ? '0 0 0 0 rgba(255, 68, 68, 0.4)' 
+                      : '0 6px 20px rgba(33, 150, 243, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {isListening ? '⏹️' : '🎤'}
+                </button>
+              </div>
+              
+              {isListening && (
+                <div style={{ 
+                  textAlign: 'center',
+                  padding: '20px'
+                }}>
+                  <p style={{ 
+                    fontSize: '18px', 
+                    color: '#ff4444',
+                    fontWeight: '600',
+                    margin: '0'
+                  }}>
+                    Listening...
+                  </p>
+                  <p style={{ 
+                    fontSize: '14px', 
+                    color: '#666',
+                    margin: '5px 0 0 0'
+                  }}>
+                    Speak clearly into your microphone
+                  </p>
+                </div>
+              )}
               
               {voiceSearchResults.length > 0 && (
-                <div style={{ marginTop: '20px', textAlign: 'left' }}>
-                  <h4>Found {voiceSearchResults.length} memories:</h4>
+                <div style={{ marginTop: '20px' }}>
+                  <h4>Search Results:</h4>
+                  <p>{voiceSearchResults.length} memories found</p>
                   {voiceSearchResults.map(memory => (
-                    <div 
-                      key={memory.id}
-                      onClick={() => {
+                    <div key={memory.id} style={{ 
+                      padding: '15px',
+                      marginTop: '10px',
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      border: '1px solid #e0e0e0',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                    onClick={() => {
+                      if (memory.audio_url) {
                         const audio = new Audio(memory.audio_url)
                         audio.play()
-                      }}
-                      style={{
-                        padding: '10px',
-                        margin: '5px 0',
-                        background: 'white',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <span style={{ 
-                        display: 'inline-block',
-                        padding: '2px 8px',
-                        background: emotionGradients[memory.emotion],
-                        color: 'white',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        marginRight: '8px'
-                      }}>
-                        {memory.emotion}
+                      }
+                    }}>
+                      <span style={{ marginRight: '10px' }}>
+                        {memory.emotion === 'happy' && '😊'}
+                        {memory.emotion === 'sad' && '😢'}
+                        {memory.emotion === 'grateful' && '🙏'}
+                        {memory.emotion === 'excited' && '🎉'}
                       </span>
                       {memory.transcript.substring(0, 50)}...
+                      <span style={{ marginLeft: '10px', color: '#2196F3' }}>▶️ Play</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            
             {memories.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px 40px',
-                background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)',
-                borderRadius: '16px',
-                border: '2px dashed #ddd',
-                animation: 'float 3s ease-in-out infinite'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>🏺</div>
-                <h3 style={{ color: '#666', marginBottom: '15px' }}>Your jar is waiting for memories</h3>
-                <p style={{ color: '#888', marginBottom: '25px' }}>
-                  Start filling it with your voice, one story at a time
-                </p>
-                <button
-                  onClick={() => setCurrentScreen('welcome')}
-                  style={{
-                    padding: '12px 30px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-2px)'
-                    e.target.style.boxShadow = '0 6px 20px rgba(76, 175, 80, 0.4)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = '0 4px 15px rgba(76, 175, 80, 0.3)'
-                  }}
-                >
-                  Record Your First Memory
-                </button>
-              </div>
+              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+                No memories recorded yet. Start by recording your first memory above!
+              </p>
             ) : (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '20px'
-              }}>
-                {memories.map(memory => (
-                  <div 
+              <div style={{ display: 'grid', gap: '15px' }}>
+                {memories.map((memory) => (
+                  <div
                     key={memory.id}
                     style={{
+                      border: '1px solid #e1e5e9',
+                      borderRadius: '10px',
                       padding: '20px',
-                      background: 'white',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                      border: '1px solid #eee',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-5px)'
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.12)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.08)'
+                      background: '#f8f9fa'
                     }}
                   >
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '15px'
-                    }}>
-                      <span style={{ 
-                        padding: '6px 12px',
-                        background: emotionGradients[memory.emotion],
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{
+                        background: '#667eea',
                         color: 'white',
-                        borderRadius: '20px',
-                        fontSize: '14px',
+                        padding: '4px 12px',
+                        borderRadius: '15px',
+                        fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
-                        {memory.emotion}
+                        {memory.emotion.toUpperCase()}
                       </span>
-                      <span style={{ fontSize: '14px', color: '#999' }}>
+                      <span style={{ color: '#666', fontSize: '12px' }}>
                         {new Date(memory.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                    
-                    {memory.themes && memory.themes.length > 0 && (
-                      <div style={{ marginBottom: '10px' }}>
-                        {memory.themes.map((theme, idx) => (
-                          <span 
-                            key={idx}
-                            style={{
-                              display: 'inline-block',
-                              padding: '4px 8px',
-                              marginRight: '5px',
-                              marginBottom: '5px',
-                              backgroundColor: '#e8f5e9',
-                              color: '#2e7d32',
-                              borderRadius: '12px',
-                              fontSize: '12px'
-                            }}
-                          >
-                            {theme}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <p style={{ 
-                      fontSize: '16px',
-                      lineHeight: '1.5',
-                      color: '#333',
-                      marginBottom: '15px'
-                    }}>
+                    <p style={{ color: '#333', lineHeight: '1.5', margin: 0 }}>
                       {memory.transcript}
                     </p>
-                    
-                    <audio 
-                      controls 
-                      style={{ width: '100%', marginBottom: '10px' }}
-                      src={memory.audio_url}
-                    />
-                    
-                    <button 
-                      onClick={() => shareMemory(memory.id)}
-                      style={{ 
-                        width: '100%',
-                        padding: '10px',
-                        backgroundColor: '#2196F3',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#1976D2'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#2196F3'}
-                    >
-                      📤 Share Memory
-                    </button>
-                    
-                    {shareLinks[memory.id] && (
-                      <p style={{ 
-                        fontSize: '12px', 
-                        marginTop: '8px', 
-                        color: '#666',
-                        wordBreak: 'break-all'
-                      }}>
-                        Link copied: {shareLinks[memory.id]}
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        )}
+        </div>
+      </div>
+    )
+  }
 
-        {/* Stories Screen */}
-        {currentScreen === 'stories' && currentUser && (
-          <div style={{ padding: '40px 20px' }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
-              Transform Your Memories into Audio Stories
-            </h2>
-            
-            {stories.length === 0 && memories.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px 40px',
-                background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-                borderRadius: '16px',
-                border: '2px dashed #81c784',
-                animation: 'float 3s ease-in-out infinite'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>📚</div>
-                <h3 style={{ color: '#388e3c', marginBottom: '15px' }}>No stories yet</h3>
-                <p style={{ color: '#558b2f', marginBottom: '25px' }}>
-                  Record some memories first, then weave them into beautiful audio narratives
+  // Stories screen
+  if (currentScreen === 'stories') {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
+        {/* Header */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '30px'
+        }}>
+          <button
+            onClick={() => setCurrentScreen('welcome')}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ← Back
+          </button>
+          <h1 style={{ 
+            color: 'white', 
+            fontSize: '24px', 
+            fontWeight: 'bold',
+            margin: 0
+          }}>
+            Stories
+          </h1>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          {/* Story Generation */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            marginBottom: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2>Your Family Stories</h2>
+            <p style={{ color: '#666', marginBottom: '30px' }}>
+              Transform your recordings into shareable audio stories
+            </p>
+
+            {memories.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <p style={{ color: '#666', marginBottom: '20px' }}>
+                  You need to record some memories first before creating stories.
                 </p>
                 <button
-                  onClick={() => setCurrentScreen('welcome')}
+                  onClick={() => setCurrentScreen('memories')}
                   style={{
-                    padding: '12px 30px',
-                    backgroundColor: '#4CAF50',
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-2px)'
-                    e.target.style.boxShadow = '0 6px 20px rgba(76, 175, 80, 0.4)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = '0 4px 15px rgba(76, 175, 80, 0.3)'
+                    fontSize: '14px',
+                    fontWeight: 'bold'
                   }}
                 >
-                  Start Recording
+                  Record Memories
                 </button>
               </div>
             ) : (
-              <>
-                {memories.length > 0 && (
-                  <div style={{ 
-                    marginBottom: '30px',
-                    padding: '20px',
-                    background: '#f5f5f5',
-                    borderRadius: '12px'
-                  }}>
-                    <h3 style={{ marginBottom: '15px' }}>Select memories to create a story:</h3>
-                    <div style={{ 
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                      gap: '10px',
-                      marginBottom: '20px'
-                    }}>
-                      {memories.map(memory => (
-                        <label 
-                          key={memory.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px',
-                            background: selectedMemories.includes(memory.id) ? '#e8f5e9' : 'white',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            border: selectedMemories.includes(memory.id) ? '2px solid #4CAF50' : '2px solid #ddd'
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMemories.includes(memory.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedMemories([...selectedMemories, memory.id])
-                              } else {
-                                setSelectedMemories(selectedMemories.filter(id => id !== memory.id))
-                              }
-                            }}
-                            style={{ marginRight: '10px' }}
-                          />
-                          <span style={{ 
-                            padding: '2px 8px',
-                            background: emotionGradients[memory.emotion],
-                            color: 'white',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            marginRight: '8px'
-                          }}>
-                            {memory.emotion}
-                          </span>
-                          <span style={{ fontSize: '14px', color: '#666' }}>
-                            {memory.transcript.substring(0, 30)}...
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    
-                    <button
-                      onClick={generateStory}
-                      disabled={selectedMemories.length === 0 || isGenerating}
+              <div>
+                <h3 style={{ marginBottom: '15px', color: '#333' }}>Select Memories for Your Story</h3>
+                <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
+                  {memories.map((memory) => (
+                    <label
+                      key={memory.id}
                       style={{
-                        padding: '12px 30px',
-                        backgroundColor: selectedMemories.length === 0 ? '#ccc' : '#9C27B0',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        cursor: selectedMemories.length === 0 ? 'not-allowed' : 'pointer',
-                        width: '100%'
-                      }}
-                    >
-                      {isGenerating ? '✨ Creating your audio story...' : '✨ Create Audio Story'}
-                    </button>
-                  </div>
-                )}
-                
-                {/* Display Stories */}
-                {stories.length > 0 && (
-                  <div>
-                    <h3 style={{ marginBottom: '20px' }}>Your Audio Stories</h3>
-                    {stories.map(story => (
-                      <div 
-                        key={story.id}
-                        style={{
-                          padding: '25px',
-                          background: 'white',
-                          borderRadius: '16px',
-                          marginBottom: '20px',
-                          boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                          border: '1px solid #eee'
-                        }}
-                      >
-                        <h4 style={{ marginBottom: '15px', color: '#333' }}>
-                          {story.title || `Story from ${new Date(story.created_at).toLocaleDateString()}`}
-                        </h4>
-                        <p style={{ 
-                          fontSize: '16px',
-                          lineHeight: '1.8',
-                          color: '#555',
-                          marginBottom: '20px'
-                        }}>
-                          {story.story_text}
-                        </p>
-                        
-                        {story.audio_url ? (
-                          <div style={{ marginBottom: '15px' }}>
-                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-                              🎭 Narrated by ElevenLabs AI
-                            </p>
-                            <audio 
-                              controls 
-                              style={{ width: '100%' }}
-                              src={story.audio_url}
-                            />
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => generateAudioNarration(story)}
-                            style={{
-                              padding: '10px 20px',
-                              backgroundColor: '#9C27B0',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: 'bold',
-                              width: '100%',
-                              marginBottom: '10px'
-                            }}
-                          >
-                            🎭 Generate Audio Narration
-                          </button>
-                        )}
-                        
-                        <div style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-                          Created from {story.memory_ids?.length || 0} memories
-                        </div>
-                        
-                        <button
-                          onClick={() => {
-                            const link = `https://mymemoryjar.com/story/${story.id}`
-                            navigator.clipboard.writeText(link)
-                            setSuccessMessage('Story link copied! 📋')
-                            setTimeout(() => setSuccessMessage(''), 3000)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            backgroundColor: '#2196F3',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          📤 Share Audio Story
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Family Screen */}
-        {currentScreen === 'family' && currentUser && (
-          <div style={{ padding: '40px 20px' }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '30px' }}>
-              Family Access
-            </h2>
-            
-            {familyMembers.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px 40px',
-                background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
-                borderRadius: '16px',
-                border: '2px dashed #ffb74d',
-                animation: 'float 3s ease-in-out infinite'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>👨‍👩‍👧‍👦</div>
-                <h3 style={{ color: '#e65100', marginBottom: '15px' }}>Share memories with loved ones</h3>
-                <p style={{ color: '#ef6c00', marginBottom: '25px' }}>
-                  Invite family members to listen, contribute, and preserve stories together
-                </p>
-                <button
-                  onClick={() => {
-                    const name = prompt('Family member name:')
-                    const email = prompt('Their email:')
-                    if (name && email) {
-                      addFamilyMember(name, email, 'viewer')
-                    }
-                  }}
-                  style={{
-                    padding: '12px 30px',
-                    backgroundColor: '#FF9800',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 15px rgba(255, 152, 0, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-2px)'
-                    e.target.style.boxShadow = '0 6px 20px rgba(255, 152, 0, 0.4)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = '0 4px 15px rgba(255, 152, 0, 0.3)'
-                  }}
-                >
-                  Invite First Member
-                </button>
-              </div>
-            ) : (
-              <>
-                <div style={{ 
-                  marginBottom: '30px',
-                  padding: '20px',
-                  background: '#f5f5f5',
-                  borderRadius: '12px'
-                }}>
-                  <button
-                    onClick={() => {
-                      const name = prompt('Family member name:')
-                      const email = prompt('Their email:')
-                      if (name && email) {
-                        addFamilyMember(name, email, 'viewer')
-                      }
-                    }}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      width: '100%'
-                    }}
-                  >
-                    + Invite Family Member
-                  </button>
-                </div>
-                
-                <div style={{ 
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                  gap: '20px'
-                }}>
-                  {familyMembers.map(member => (
-                    <div 
-                      key={member.id}
-                      style={{
-                        padding: '20px',
-                        background: 'white',
-                        borderRadius: '12px',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <h4 style={{ marginBottom: '10px' }}>{member.name || 'Family Member'}</h4>
-                      <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-                        {member.member_email}
-                      </p>
-                      <div style={{ 
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <span style={{
-                          padding: '4px 12px',
-                          backgroundColor: member.access_level === 'all' ? '#4CAF50' : '#2196F3',
-                          color: 'white',
-                          borderRadius: '12px',
-                          fontSize: '12px'
-                        }}>
-                          {member.access_level}
-                        </span>
-                        <button
-                          onClick={async () => {
-                            const newAccess = member.access_level === 'selected' ? 'all' : 'selected'
-                            const { error } = await supabase
-                              .from('family_members')
-                              .update({ access_level: newAccess })
-                              .eq('id', member.id)
-                            
-                            if (!error) {
-                              setFamilyMembers(familyMembers.map(m => 
-                                m.id === member.id 
-                                  ? { ...m, access_level: newAccess }
-                                  : m
-                              ))
-                            }
-                          }}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#f5f5f5',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Change Access
-                        </button>
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        padding: '15px',
+                        border: selectedMemories.includes(memory.id) ? '2px solid #667eea' : '1px solid #e1e5e9',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        background: selectedMemories.includes(memory.id) ? '#f0f4ff' : '#f8f9fa'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMemories.includes(memory.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMemories(prev => [...prev, memory.id])
+                          } else {
+                            setSelectedMemories(prev => prev.filter(id => id !== memory.id))
+                          }
+                        }}
+                        style={{ marginTop: '2px' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                          <span style={{
+                            background: '#667eea',
+                            color: 'white',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            {memory.emotion.toUpperCase()}
+                          </span>
+                          <span style={{ color: '#666', fontSize: '12px' }}>
+                            {new Date(memory.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p style={{ color: '#333', fontSize: '14px', lineHeight: '1.4', margin: 0 }}>
+                          {memory.transcript.substring(0, 150)}...
+                        </p>
                       </div>
-                    </div>
+                    </label>
                   ))}
                 </div>
-                
-                <div style={{ 
-                  marginTop: '40px',
-                  padding: '20px',
-                  background: '#e8f5e9',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <h4 style={{ marginBottom: '10px' }}>Family Stats</h4>
-                  <div style={{ 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '20px',
-                    marginTop: '20px'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4CAF50' }}>
-                        {memories.length}
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Total Memories</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#9C27B0' }}>
-                        {stories.length}
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Stories Created</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#FF9800' }}>
-                        {familyMembers.length}
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Family Members</div>
-                    </div>
-                  </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    onClick={generateStory}
+                    disabled={selectedMemories.length === 0 || isGeneratingStory}
+                    style={{
+                      padding: '15px 30px',
+                      background: selectedMemories.length === 0 || isGeneratingStory 
+                        ? '#ccc' 
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '25px',
+                      cursor: selectedMemories.length === 0 || isGeneratingStory ? 'not-allowed' : 'pointer',
+                      fontSize: '16px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {isGeneratingStory ? 'Creating Story...' : 'Create Story from Memories'}
+                  </button>
+                  <p style={{ color: '#666', fontSize: '12px', marginTop: '10px' }}>
+                    Select at least one memory to create a story
+                  </p>
                 </div>
-              </>
+              </div>
             )}
           </div>
-        )}
 
-        {/* Pricing Screen */}
-        {currentScreen === 'pricing' && (
-          <div style={{ padding: '40px 20px' }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '10px' }}>
-              Choose Your Plan
-            </h2>
-            <p style={{ textAlign: 'center', color: '#666', marginBottom: '40px' }}>
-              Preserve unlimited memories with Premium
+          {/* Generated Stories */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Generated Stories</h2>
+            {stories.length === 0 ? (
+              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+                No stories created yet. Generate your first story above!
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {stories.map((story) => (
+                  <div
+                    key={story.id}
+                    style={{
+                      border: '1px solid #e1e5e9',
+                      borderRadius: '15px',
+                      padding: '25px',
+                      background: '#f8f9fa'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ color: '#333', margin: 0 }}>Family Story</h3>
+                      <span style={{ color: '#666', fontSize: '12px' }}>
+                        {new Date(story.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p style={{ color: '#333', lineHeight: '1.6', marginBottom: '15px' }}>
+                      {story.story_text}
+                    </p>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      <strong>Based on {story.memory_ids.length} memories</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  // Family screen
+  if (currentScreen === 'family') {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
+        {/* Header */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '30px'
+        }}>
+          <button
+            onClick={() => setCurrentScreen('welcome')}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ← Back
+          </button>
+          <h1 style={{ 
+            color: 'white', 
+            fontSize: '24px', 
+            fontWeight: 'bold',
+            margin: 0
+          }}>
+            Family Circle
+          </h1>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          {/* Add Family Member */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            marginBottom: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Invite Family Members</h2>
+            <p style={{ color: '#666', marginBottom: '20px' }}>
+              Share your memories and stories with family members by inviting them to your circle.
             </p>
             
-            <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '30px',
-              maxWidth: '900px',
-              margin: '0 auto'
-            }}>
-              {/* Free Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                textAlign: 'center',
-                border: '1px solid #eee'
-              }}>
-                <h3 style={{ color: '#333', marginBottom: '10px' }}>Free</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $0
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>Perfect for getting started</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Up to 10 memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Basic story creation</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ 2 family members</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Voice search</li>
-                  <li style={{ padding: '8px 0', color: '#999' }}>❌ Audio story narration</li>
-                  <li style={{ padding: '8px 0', color: '#999' }}>❌ Blockchain verification</li>
-                </ul>
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#f5f5f5',
-                  color: '#333',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
-                }}>
-                  Current Plan
-                </button>
-              </div>
-
-              {/* Premium Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 8px 20px rgba(156, 39, 176, 0.15)',
-                textAlign: 'center',
-                border: '2px solid #9C27B0',
-                position: 'relative'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '-15px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: '#9C27B0',
-                  color: 'white',
-                  padding: '5px 20px',
-                  borderRadius: '20px',
+            <form onSubmit={addFamilyMember} style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="email"
+                placeholder="Enter family member's email"
+                value={newMemberEmail}
+                onChange={(e) => setNewMemberEmail(e.target.value)}
+                required
+                style={{
+                  flex: 1,
+                  padding: '12px 15px',
+                  border: '2px solid #e1e5e9',
+                  borderRadius: '10px',
                   fontSize: '14px',
-                  fontWeight: 'bold'
-                }}>
-                  MOST POPULAR
-                </div>
-                
-                <h3 style={{ color: '#9C27B0', marginBottom: '10px' }}>Premium</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $9.99
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>For active families</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited memories</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ AI audio story narration</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Unlimited family members</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced voice commands</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Blockchain verification</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Priority support</li>
-                </ul>
-                
-                <button 
-                  onClick={() => {
-                    setActiveIntegration('💳 Processing with RevenueCat...')
-                    setTimeout(() => {
-                      setActiveIntegration('')
-                      alert('Premium upgrade successful! 🎉\n\nIn production, this would process payment through RevenueCat.')
-                      // In production, would update user metadata
-                      setCurrentScreen('welcome')
-                    }, 2000)
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#9C27B0',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#7B1FA2'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#9C27B0'}
-                >
-                  Upgrade Now
-                </button>
-              </div>
-
-              {/* Enterprise Plan */}
-              <div style={{ 
-                backgroundColor: 'white',
-                padding: '40px 30px',
-                borderRadius: '16px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                textAlign: 'center',
-                border: '1px solid #eee'
-              }}>
-                <h3 style={{ color: '#333', marginBottom: '10px' }}>Enterprise</h3>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-                  $19.99
-                  <span style={{ fontSize: '18px', color: '#666' }}>/month</span>
-                </div>
-                <p style={{ color: '#666', marginBottom: '30px' }}>For large families & organizations</p>
-                
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0, 
-                  textAlign: 'left',
-                  marginBottom: '30px'
-                }}>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Everything in Premium</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Custom AI voices</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Advanced analytics</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ White-label options</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ API access</li>
-                  <li style={{ padding: '8px 0', color: '#333' }}>✅ Dedicated support</li>
-                </ul>
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#333',
+                  outline: 'none'
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
-                }}>
-                  Contact Sales
-                </button>
-              </div>
-            </div>
-            
-            <div style={{ 
-              marginTop: '60px',
-              padding: '30px',
-              backgroundColor: '#f0f8ff',
-              borderRadius: '16px',
-              textAlign: 'center'
-            }}>
-              <h4 style={{ marginTop: '0', marginBottom: '15px' }}>💳 Powered by RevenueCat</h4>
-              <p style={{ fontSize: '16px', color: '#666', marginBottom: '0' }}>
-                Secure payment processing • Cancel anytime • Family-friendly pricing
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Invite
+              </button>
+            </form>
+          </div>
+
+          {/* Family Members List */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            padding: '30px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Family Members</h2>
+            {familyMembers.length === 0 ? (
+              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+                No family members added yet. Invite your first family member above!
               </p>
-            </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '15px' }}>
+                {familyMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '20px',
+                      border: '1px solid #e1e5e9',
+                      borderRadius: '10px',
+                      background: '#f8f9fa'
+                    }}
+                  >
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>
+                        {member.member_email}
+                      </p>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
+                        Added {new Date(member.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <select
+                        value={member.access_level}
+                        onChange={(e) => updateMemberAccess(member.id, e.target.value)}
+                        style={{
+                          padding: '8px 12px',
+                          border: '1px solid #e1e5e9',
+                          borderRadius: '5px',
+                          fontSize: '12px',
+                          background: 'white'
+                        }}
+                      >
+                        <option value="all">All Memories</option>
+                        <option value="selected">Selected Only</option>
+                        <option value="none">No Access</option>
+                      </select>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        background: member.access_level === 'all' ? '#27ae60' : 
+                                   member.access_level === 'selected' ? '#f39c12' : '#e74c3c',
+                        color: 'white'
+                      }}>
+                        {member.access_level.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Footer with All Integrations */}
-      <footer style={{ 
-        marginTop: '80px',
-        padding: '40px 20px',
-        borderTop: '1px solid #eee',
-        textAlign: 'center',
-        background: '#fafafa'
-      }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <p style={{ 
-            color: '#666', 
-            marginBottom: '20px',
-            fontSize: '16px'
-          }}>
-            Built with: Bolt.new | Supabase | OpenAI | ElevenLabs | Algorand | RevenueCat | Entri | Netlify
-          </p>
-          
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            gap: '15px',
-            flexWrap: 'wrap',
-            marginTop: '30px'
-          }}>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              ⚡ Bolt.new
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              🗄️ Supabase
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              🤖 OpenAI
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              🎭 ElevenLabs
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              ⛓️ Algorand
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              💳 RevenueCat
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              🌐 Entri
-            </span>
-            <span style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#f0f0f0', 
-              borderRadius: '20px', 
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              🚀 Netlify
-            </span>
-          </div>
-          
-          <p style={{ 
-            marginTop: '30px',
-            color: '#999',
-            fontSize: '14px'
-          }}>
-            © 2025 My Memory Jar • mymemoryjar.com
-          </p>
         </div>
-      </footer>
 
-      {/* Bolt.new Badge - MANDATORY for Hackathon */}
-      <div style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        zIndex: 1000,
-        backgroundColor: '#000',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-      }}>
-        <a 
-          href="https://bolt.new" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          style={{
-            color: '#fff',
-            textDecoration: 'none',
-            fontSize: '14px',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          Built with ⚡ Bolt.new
-        </a>
+        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        }}>
+          <a 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Built with ⚡ Bolt.new
+          </a>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return null
 }
 
 export default App
