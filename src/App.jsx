@@ -269,12 +269,30 @@ const generateStory = async () => {
       }
       
       const savedStory = await storyService.saveStory(story)
-      if (savedStory) {
-        setStories(prev => [savedStory, ...prev])
-        setSelectedMemories([])
+    if (savedStory) {
+      setStories(prev => [savedStory, ...prev])
+      setSelectedMemories([])
+      
+      // After saving story to database, add blockchain verification
+      if (savedStory.audio_url) {
+        try {
+          // Mock Algorand integration - in production, use actual Algorand SDK
+          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
+          console.log('🔗 Blockchain verification:', blockchainTx)
+          
+          // Update story with blockchain tx
+          const { data: updatedStory } = await supabaseClient
+            .from('stories')
+            .update({ blockchain_tx: blockchainTx })
+            .eq('id', savedStory.id)
+            .select()
+            .single()
+          
+          alert(`Story saved and verified on blockchain! Tx: ${blockchainTx}`)
+        } catch (error) {
+          console.log('Blockchain verification skipped:', error)
+        }
       }
-      setIsGeneratingStory(false)
-      return
     }
     
     // Get selected memories data
@@ -359,26 +377,6 @@ Create a narrative that faithfully preserves these exact memories, adding only m
   }
 }
   
-// After saving story to database, add blockchain verification
-if (savedStory && savedStory.audio_url) {
-  try {
-    // Mock Algorand integration - in production, use actual Algorand SDK
-    const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
-    console.log('🔗 Blockchain verification:', blockchainTx)
-    
-    // Update story with blockchain tx
-    const { data: updatedStory } = await supabaseClient
-      .from('stories')
-      .update({ blockchain_tx: blockchainTx })
-      .eq('id', savedStory.id)
-      .select()
-      .single()
-    
-    alert(`Story saved and verified on blockchain! Tx: ${blockchainTx}`)
-  } catch (error) {
-    console.log('Blockchain verification skipped:', error)
-  }
-}
 
 // Generate audio narration with ElevenLabs
 const generateAudioNarration = async (text, apiKey) => {
