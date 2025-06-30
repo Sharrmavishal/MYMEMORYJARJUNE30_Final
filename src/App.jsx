@@ -231,12 +231,15 @@ const saveMemory = async () => {
       setAudioBlob(null)
       
       // Show success message
-      alert('Memory saved successfully!')
-    }
-  } catch (error) {
-    console.error('Error saving memory:', error)
-    alert('Failed to save memory. Please try again.')
-  }
+alert('Memory saved successfully! Go to Stories tab to create audio narratives of your memories.')
+
+// Reset to emotion selection for next memory
+setSelectedEmotion('')
+}
+} catch (error) {
+  console.error('Error saving memory:', error)
+  alert('Failed to save memory. Please try again.')
+}
 }
 
 // Story generation with real GPT-4 API
@@ -1097,7 +1100,9 @@ const generateAudioNarration = async (text, apiKey) => {
             {/* Emotion Selection */}
             {!selectedEmotion && (
               <div>
-                <p style={{ marginBottom: '20px', color: '#666' }}>How are you feeling about this memory?</p>
+                <p style={{ marginBottom: '20px', color: '#666' }}>
+  {transcript ? 'How did this memory make you feel?' : 'What emotion does this memory evoke?'}
+</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
                   {[
                     { emotion: 'happy', emoji: '😊', label: 'Happy' },
@@ -1225,7 +1230,10 @@ const generateAudioNarration = async (text, apiKey) => {
             {/* Transcript Review */}
             {transcript && (
               <div>
-                <h3 style={{ marginBottom: '15px', color: '#333' }}>Review Your Memory</h3>
+                <h3 style={{ marginBottom: '15px', color: '#333' }}>Review & Save Your Memory</h3>
+<p style={{ marginBottom: '15px', color: '#666', fontSize: '14px' }}>
+  After saving, visit the Stories tab to transform your memories into AI-narrated audio stories!
+</p>
                 <div style={{
                   background: '#f8f9fa',
                   padding: '20px',
