@@ -274,21 +274,23 @@ const generateStory = async () => {
     // Get selected memories data
     const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
     
-    // Create prompt for GPT-4
-    const prompt = `You are helping preserve real family memories exactly as they were shared.
+   // Create prompt for GPT-4
+const prompt = `You are creating a gentle narration of family memories that preserves the exact recorded words.
 
-Based on these recorded memories, create a faithful narrative that:
-- Preserves the EXACT words and content from the memories
-- Connects them chronologically if multiple memories
-- Adds minimal context only to link memories together
-- Maintains the authentic voice and emotion
-- Does NOT add fictional elements, characters, or storylines
-- Keeps the original meaning and intent
+Instructions:
+- Include the EXACT words that were spoken in quotes
+- Add minimal narration to provide context (who spoke, when, the emotion)
+- Keep descriptions simple and factual
+- Do NOT embellish or add fictional elements
 
-Here are the actual memories to preserve:
-${selectedMemoryData.map((m, i) => `Memory ${i + 1} (${m.emotion}): ${m.transcript}`).join('\n\n')}
+Example format:
+"In a moment of joy, they said: 'Hello, hello, hello.' Later, with gratitude in their voice, they repeated: 'Hello, hello, hello.'"
 
-Create a narrative that faithfully preserves these exact memories, adding only minimal connecting words between them if needed. Keep it under 250 words.`
+Memories to narrate:
+${selectedMemoryData.map((m, i) => `Memory ${i + 1} - Emotion: ${m.emotion}
+Words spoken: "${m.transcript}"`).join('\n\n')}
+
+Create a simple narration that includes the exact words in quotes, with brief context about the emotion and moment. Keep under 200 words.`
     
     // Call GPT-4 API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
