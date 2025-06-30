@@ -498,51 +498,70 @@ const generateAudioNarration = async (text, apiKey) => {
   }
 
   const startVoiceSearch = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice search is not supported in your browser. Try Chrome or Edge.')
-      return
-    }
-    
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    const recognition = new SpeechRecognition()
-    
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.lang = 'en-US'
-    
-    recognition.onstart = () => {
-      setIsListening(true)
-      setVoiceSearchActive(true)
-      setVoiceSearchResults([])
-    }
-    
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript.toLowerCase()
-      
-      const results = memories.filter(memory => 
-        memory.transcript.toLowerCase().includes(transcript) ||
-        memory.emotion.toLowerCase().includes(transcript)
-      )
-      
-      setVoiceSearchResults(results)
-      
-      if (results.length === 1 && transcript.includes('play')) {
-        const audio = new Audio(results[0].audio_url)
-        audio.play()
-      }
-    }
-    
-    recognition.onerror = () => {
-      setIsListening(false)
-      alert('Voice search failed. Please try again.')
-    }
-    
-    recognition.onend = () => {
-      setIsListening(false)
-    }
-    
-    recognition.start()
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    alert('Voice search is not supported in your browser. Try Chrome or Edge.')
+    return
   }
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  const recognition = new SpeechRecognition()
+  
+  recognition.continuous = false
+  recognition.interimResults = false
+  recognition.lang = 'en-US'
+  
+  recognition.onstart = () => {
+    setIsListening(true)
+    setVoiceSearchActive(true)
+    setVoiceSearchResults([])
+  }
+  
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript.toLowerCase()
+    console.log('Voice search heard:', transcript) // Debug log
+    
+    // More flexible search - look for any word match
+    const searchWords = transcript.split(' ')
+    const results = memories.filter(memory => {
+      const memoryText = memory.transcript.toLowerCase()
+      const emotionMatch = memory.emotion.toLowerCase()
+      
+      // Check if any word from voice search appears in memory
+      return searchWords.some(word => 
+        memoryText.includes(word) || 
+        emotionMatch.includes(word)
+      )
+    })
+    
+    console.log('Found results:', results.length) // Debug log
+    setVoiceSearchResults(results)
+    
+    // Auto-play if only one result and user said "play"
+    if (results.length === 1 && transcript.includes('play')) {
+      const audio = new Audio(results[0].audio_url)
+      audio.play()
+    }
+    
+    // Show message if no results
+    if (results.length === 0) {
+      alert(`No memories found for: "${transcript}". Try saying words from your memories or emotions like "happy", "sad", etc.`)
+    }
+  }
+  
+  recognition.onerror = (event) => {
+    console.error('Voice search error:', event.error)
+    setIsListening(false)
+    alert('Voice search failed. Please try again.')
+  }
+  
+  recognition.onend = () => {
+    setIsListening(false)
+    // Keep voiceSearchActive true so results stay visible
+    // Don't reset voiceSearchResults here
+  }
+  
+  recognition.start()
+}
 
   // Loading state
   if (loading) {
@@ -1336,82 +1355,106 @@ const generateAudioNarration = async (text, apiKey) => {
                 </div>
               )}
               
-              {voiceSearchResults.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4>Search Results:</h4>
-                  <p>{voiceSearchResults.length} memories found</p>
-                  {voiceSearchResults.map(memory => (
-                    <div key={memory.id} style={{ 
-                      padding: '15px',
-                      marginTop: '10px',
-                      backgroundColor: 'white',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      border: '1px solid #e0e0e0',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                    }}
-                    onClick={() => {
-                      if (memory.audio_url) {
-                        const audio = new Audio(memory.audio_url)
-                        audio.play()
-                      }
-                    }}>
-                      <span style={{ marginRight: '10px' }}>
-                        {memory.emotion === 'happy' && '😊'}
-                        {memory.emotion === 'sad' && '😢'}
-                        {memory.emotion === 'grateful' && '🙏'}
-                        {memory.emotion === 'excited' && '🎉'}
-                      </span>
-                      {memory.transcript.substring(0, 50)}...
-                      <span style={{ marginLeft: '10px', color: '#2196F3' }}>▶️ Play</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {memories.length === 0 ? (
-              <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
-                No memories recorded yet. Start by recording your first memory above!
-              </p>
-            ) : (
-              <div style={{ display: 'grid', gap: '15px' }}>
-                {memories.map((memory) => (
-                  <div
-                    key={memory.id}
-                    style={{
-                      border: '1px solid #e1e5e9',
-                      borderRadius: '10px',
-                      padding: '20px',
-                      background: '#f8f9fa'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <span style={{
-                        background: '#667eea',
-                        color: 'white',
-                        padding: '4px 12px',
-                        borderRadius: '15px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        {memory.emotion.toUpperCase()}
-                      </span>
-                      <span style={{ color: '#666', fontSize: '12px' }}>
-                        {new Date(memory.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p style={{ color: '#333', lineHeight: '1.5', margin: 0 }}>
-                      {memory.transcript}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+             {voiceSearchResults.length > 0 && (
+  <div style={{ marginTop: '20px' }}>
+    <h4>Search Results:</h4>
+    <p>{voiceSearchResults.length} memories found</p>
+    {voiceSearchResults.map(memory => (
+      <div key={memory.id} style={{ 
+        padding: '15px',
+        marginTop: '10px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        cursor: 'pointer',
+        border: '1px solid #e0e0e0',
+        transition: 'all 0.2s ease',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+      }}
+      onClick={() => {
+        if (memory.audio_url) {
+          const audio = new Audio(memory.audio_url)
+          audio.play()
+        }
+      }}>
+        <span style={{ marginRight: '10px' }}>
+          {memory.emotion === 'happy' && '😊'}
+          {memory.emotion === 'sad' && '😢'}
+          {memory.emotion === 'grateful' && '🙏'}
+          {memory.emotion === 'excited' && '🎉'}
+        </span>
+        {memory.transcript.substring(0, 50)}...
+        <span style={{ marginLeft: '10px', color: '#2196F3' }}>▶️ Play</span>
+      </div>
+    ))}
+  </div>
+)}
+
+{/* NEW CLEAR BUTTON ADDED HERE */}
+{voiceSearchResults.length > 0 && (
+  <div style={{ textAlign: 'center', marginTop: '20px' }}>
+    <button
+      onClick={() => {
+        setVoiceSearchResults([])
+        setVoiceSearchActive(false)
+      }}
+      style={{
+        padding: '8px 16px',
+        backgroundColor: '#666',
+        color: 'white',
+        border: 'none',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        fontSize: '14px'
+      }}
+    >
+      Clear Search Results
+    </button>
+  </div>
+)}
+
+</div>
+{memories.length === 0 ? (
+  <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>
+    No memories recorded yet. Start by recording your first memory above!
+  </p>
+) : (
+  <div style={{ display: 'grid', gap: '15px' }}>
+    {memories.map((memory) => (
+      <div
+        key={memory.id}
+        style={{
+          border: '1px solid #e1e5e9',
+          borderRadius: '10px',
+          padding: '20px',
+          background: '#f8f9fa'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{
+            background: '#667eea',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '15px',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            {memory.emotion.toUpperCase()}
+          </span>
+          <span style={{ color: '#666', fontSize: '12px' }}>
+            {new Date(memory.created_at).toLocaleDateString()}
+          </span>
         </div>
-        
-        {/* Bolt.new Badge - MANDATORY for Hackathon */}
+        <p style={{ color: '#333', lineHeight: '1.5', margin: 0 }}>
+          {memory.transcript}
+        </p>
+      </div>
+    ))}
+  </div>
+)}
+</div>
+</div>
+
+{/* Bolt.new Badge - MANDATORY for Hackathon */}
         <div style={{
           position: 'fixed',
           bottom: '20px',
