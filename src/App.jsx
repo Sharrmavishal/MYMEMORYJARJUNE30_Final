@@ -387,11 +387,12 @@ const createAlgorandTransaction = async (storyId, storyText) => {
       setSelectedMemories([])
       
       // After saving story to database, add blockchain verification
-      if (savedStory.audio_url) {
-        try {
-          // Mock Algorand integration - in production, use actual Algorand SDK
-          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
-          console.log('🔗 Blockchain verification:', blockchainTx)
+if (savedStory.audio_url) {
+  try {
+    // Try real Algorand first, fallback to mock
+    const algorandTxId = await createAlgorandTransaction(savedStory.id, storyText)
+    const blockchainTx = algorandTxId || `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
+    console.log('🔗 Blockchain verification:', blockchainTx)
           
           // Update story with blockchain tx
           const { data: updatedStory } = await supabaseClient
