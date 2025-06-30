@@ -368,7 +368,7 @@ if (savedStory && savedStory.audio_url) {
     
     // Update story with blockchain tx
     const { data: updatedStory } = await supabaseClient
-  .from('stories')
+      .from('stories')
       .update({ blockchain_tx: blockchainTx })
       .eq('id', savedStory.id)
       .select()
