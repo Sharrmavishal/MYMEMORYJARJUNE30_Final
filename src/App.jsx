@@ -280,6 +280,18 @@ const generateStory = async () => {
           const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
           console.log('🔗 Blockchain verification:', blockchainTx)
           
+          const savedStory = await storyService.saveStory(story)
+    if (savedStory) {
+      setStories(prev => [savedStory, ...prev])
+      setSelectedMemories([])
+      
+      // After saving story to database, add blockchain verification
+      if (savedStory.audio_url) {
+        try {
+          // Mock Algorand integration - in production, use actual Algorand SDK
+          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
+          console.log('🔗 Blockchain verification:', blockchainTx)
+          
           // Update story with blockchain tx
           const { data: updatedStory } = await supabaseClient
             .from('stories')
