@@ -189,6 +189,12 @@ const transcribeAudio = async () => {
     setIsTranscribing(false)
   }
 }
+// Add this before saving memory
+if (memories.length >= 10 && !user.isPremium) {
+  alert('You\'ve reached your free limit! Upgrade to Premium to continue saving memories.')
+  setCurrentScreen('pricing')
+  return
+}
 
  // Save memory to database with audio upload
 const saveMemory = async () => {
