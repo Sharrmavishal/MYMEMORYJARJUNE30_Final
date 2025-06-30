@@ -275,21 +275,20 @@ const generateStory = async () => {
     const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
     
     // Create prompt for GPT-4
-    const prompt = `You are a talented storyteller creating a heartwarming family narrative. 
-    
-    Based on these family memories, create a beautiful, cohesive story that weaves them together:
-    
-    ${selectedMemoryData.map((m, i) => `Memory ${i + 1} (${m.emotion}): ${m.transcript}`).join('\n\n')}
-    
-    Create a narrative that:
-    - Connects these memories into a flowing story
-    - Captures the emotions and significance
-    - Uses vivid, descriptive language
-    - Is suitable for all ages
-    - Feels like a treasured family story
-    - Is 150-250 words long
-    
-    Write the story in a warm, engaging narrative style.`
+const prompt = `You are helping preserve real family memories exactly as they were shared.
+
+Based on these recorded memories, create a faithful narrative that:
+- Preserves the EXACT words and content from the memories
+- Connects them chronologically if multiple memories
+- Adds minimal context only to link memories together
+- Maintains the authentic voice and emotion
+- Does NOT add fictional elements, characters, or storylines
+- Keeps the original meaning and intent
+
+Here are the actual memories to preserve:
+${selectedMemoryData.map((m, i) => `Memory ${i + 1} (${m.emotion}): ${m.transcript}`).join('\n\n')}
+
+Create a narrative that faithfully preserves these exact memories, adding only minimal connecting words between them if needed. Keep it under 250 words.`
     
     // Call GPT-4 API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
