@@ -1641,7 +1641,7 @@ const generateAudioNarration = async (text, apiKey) => {
       ))}
     </div>
   )}
-</div>
+</div> {/* Close the main container div */}
         
         {/* Bolt.new Badge - MANDATORY for Hackathon */}
         <div style={{
@@ -1671,9 +1671,9 @@ const generateAudioNarration = async (text, apiKey) => {
             Built with ⚡ Bolt.new
           </a>
         </div>
-      </div>
+      </div> {/* Close the outermost div */}
     )
-  }
+  } {/* Close the if statement */}
 
   // Family screen
   if (currentScreen === 'family') {
