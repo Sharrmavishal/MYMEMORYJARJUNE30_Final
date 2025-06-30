@@ -269,49 +269,19 @@ const generateStory = async () => {
       }
       
       const savedStory = await storyService.saveStory(story)
-    if (savedStory) {
-      setStories(prev => [savedStory, ...prev])
-      setSelectedMemories([])
-      
-      // After saving story to database, add blockchain verification
-      if (savedStory.audio_url) {
-        try {
-          // Mock Algorand integration - in production, use actual Algorand SDK
-          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
-          console.log('🔗 Blockchain verification:', blockchainTx)
-          
-          const savedStory = await storyService.saveStory(story)
-    if (savedStory) {
-      setStories(prev => [savedStory, ...prev])
-      setSelectedMemories([])
-      
-      // After saving story to database, add blockchain verification
-      if (savedStory.audio_url) {
-        try {
-          // Mock Algorand integration - in production, use actual Algorand SDK
-          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
-          console.log('🔗 Blockchain verification:', blockchainTx)
-          
-          // Update story with blockchain tx
-          const { data: updatedStory } = await supabaseClient
-            .from('stories')
-            .update({ blockchain_tx: blockchainTx })
-            .eq('id', savedStory.id)
-            .select()
-            .single()
-          
-          alert(`Story saved and verified on blockchain! Tx: ${blockchainTx}`)
-        } catch (error) {
-          console.log('Blockchain verification skipped:', error)
-        }
+      if (savedStory) {
+        setStories(prev => [savedStory, ...prev])
+        setSelectedMemories([])
       }
+      setIsGeneratingStory(false)
+      return
     }
     
     // Get selected memories data
     const selectedMemoryData = memories.filter(m => selectedMemories.includes(m.id))
     
     // Create prompt for GPT-4
-const prompt = `You are helping preserve real family memories exactly as they were shared.
+    const prompt = `You are helping preserve real family memories exactly as they were shared.
 
 Based on these recorded memories, create a faithful narrative that:
 - Preserves the EXACT words and content from the memories
@@ -379,6 +349,27 @@ Create a narrative that faithfully preserves these exact memories, adding only m
     if (savedStory) {
       setStories(prev => [savedStory, ...prev])
       setSelectedMemories([])
+      
+      // After saving story to database, add blockchain verification
+      if (savedStory.audio_url) {
+        try {
+          // Mock Algorand integration - in production, use actual Algorand SDK
+          const blockchainTx = `ALG-${Date.now()}-${savedStory.id.substring(0, 8)}`
+          console.log('🔗 Blockchain verification:', blockchainTx)
+          
+          // Update story with blockchain tx
+          const { data: updatedStory } = await supabaseClient
+            .from('stories')
+            .update({ blockchain_tx: blockchainTx })
+            .eq('id', savedStory.id)
+            .select()
+            .single()
+          
+          alert(`Story saved and verified on blockchain! Tx: ${blockchainTx}`)
+        } catch (error) {
+          console.log('Blockchain verification skipped:', error)
+        }
+      }
     }
     
   } catch (error) {
