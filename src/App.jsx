@@ -2147,12 +2147,13 @@ if (currentScreen === 'welcome') {
         Built with ⚡ Bolt.new
       </a>
     </div>
-  </div>
-)
-}
-// Pricing screen
-if (currentScreen === 'pricing') {
-return (
+      </div>
+    )
+  }
+
+  // Pricing screen
+  if (currentScreen === 'pricing') {
+    return (
 <div style={{ 
   minHeight: '100vh', 
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
