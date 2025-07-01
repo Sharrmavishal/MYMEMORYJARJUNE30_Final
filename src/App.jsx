@@ -798,9 +798,9 @@ if (currentScreen === 'welcome') {
   textAlign: 'center',
   color: 'white'
 }}>
-  <div style={{ marginBottom: isMobile ? '20px' : '40px' }}>  {/* CHANGED THIS LINE */}
+  <div style={{ marginBottom: isMobile ? '20px' : '40px' }}>  
     <h2 style={{ 
-      fontSize: isMobile ? '32px' : '48px',  {/* CHANGED THIS LINE */}
+      fontSize: isMobile ? '32px' : '48px',  
       fontWeight: 'bold', 
       marginBottom: '20px',
       lineHeight: '1.2'
@@ -808,7 +808,7 @@ if (currentScreen === 'welcome') {
       Welcome to Your Digital Memory Jar
     </h2>
     <p style={{ 
-      fontSize: isMobile ? '16px' : '20px',  {/* CHANGED THIS LINE */}
+      fontSize: isMobile ? '16px' : '20px',  
       opacity: 0.9, 
       lineHeight: '1.6',
       marginBottom: '20px'
@@ -818,49 +818,49 @@ if (currentScreen === 'welcome') {
     </p>
     <div style={{ 
       marginTop: '20px', 
-      padding: isMobile ? '12px' : '15px',  {/* CHANGED THIS LINE */}
+      padding: isMobile ? '12px' : '15px',  
       backgroundColor: '#fff3cd', 
       borderRadius: '8px',
       borderLeft: '4px solid #ffc107'
     }}>
-      <strong style={{ color: '#856404', fontSize: isMobile ? '14px' : '16px' }}>⏰ Don't wait:</strong>  {/* CHANGED THIS LINE */}
-      <span style={{ color: '#856404', marginLeft: '5px', fontSize: isMobile ? '14px' : '16px' }}>  {/* CHANGED THIS LINE */}
+      <strong style={{ color: '#856404', fontSize: isMobile ? '14px' : '16px' }}>⏰ Don't wait:</strong>  
+      <span style={{ color: '#856404', marginLeft: '5px', fontSize: isMobile ? '14px' : '16px' }}> 
         The average family has less than 5 minutes of recorded voices. Start preserving today.
       </span>
     </div>
   </div>
   
-  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginTop: '20px' }}>  {/* CHANGED THIS LINE */}
+  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginTop: '20px' }}>  
     <div style={{ 
       background: 'rgba(255,255,255,0.1)', 
-      padding: isMobile ? '15px' : '20px',  {/* CHANGED THIS LINE */}
+      padding: isMobile ? '15px' : '20px',  
       borderRadius: '15px',
       backdropFilter: 'blur(10px)'
     }}>
-      <div style={{ fontSize: isMobile ? '20px' : '24px', marginBottom: '10px' }}>🎙️</div>  {/* CHANGED THIS LINE */}
-      <h3 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px' }}>Record Memories</h3>  {/* CHANGED THIS LINE */}
-      <p style={{ fontSize: isMobile ? '12px' : '14px', opacity: 0.8 }}>Capture precious moments with voice recordings</p>  {/* CHANGED THIS LINE */}
+      <div style={{ fontSize: isMobile ? '20px' : '24px', marginBottom: '10px' }}>🎙️</div>  
+      <h3 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px' }}>Record Memories</h3>  
+      <p style={{ fontSize: isMobile ? '12px' : '14px', opacity: 0.8 }}>Capture precious moments with voice recordings</p>  
     </div>
     <div style={{ 
       background: 'rgba(255,255,255,0.1)', 
-      padding: isMobile ? '15px' : '20px',  {/* CHANGED THIS LINE */}
+      padding: isMobile ? '15px' : '20px',  
       borderRadius: '15px',
       backdropFilter: 'blur(10px)'
     }}>
-      <div style={{ fontSize: isMobile ? '20px' : '24px', marginBottom: '10px' }}>📖</div>  {/* CHANGED THIS LINE */}
-      <h3 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px' }}>Create Stories</h3>  {/* CHANGED THIS LINE */}
-      <p style={{ fontSize: isMobile ? '12px' : '14px', opacity: 0.8 }}>AI weaves your memories into beautiful narratives</p>  {/* CHANGED THIS LINE */}
+      <div style={{ fontSize: isMobile ? '20px' : '24px', marginBottom: '10px' }}>📖</div>  
+      <h3 style={{ fontSize: isMobile ? '16px' : '18px', marginBottom: '10px' }}>Create Stories</h3>  
+      <p style={{ fontSize: isMobile ? '12px' : '14px', opacity: 0.8 }}>AI weaves your memories into beautiful narratives</p>  
     </div>
   </div>
   
   <div style={{ 
-    marginTop: isMobile ? '20px' : '30px',  {/* CHANGED THIS LINE */}
-    padding: isMobile ? '15px' : '20px',  {/* CHANGED THIS LINE */}
+    marginTop: isMobile ? '20px' : '30px',  
+    padding: isMobile ? '15px' : '20px',  
     background: 'rgba(255,255,255,0.1)', 
     borderRadius: '15px',
     backdropFilter: 'blur(10px)'
   }}>
-    <p style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '15px' }}>  {/* CHANGED THIS LINE */}
+    <p style={{ fontSize: isMobile ? '14px' : '16px', marginBottom: '15px' }}>  
       <strong>How it works:</strong> Choose an emotion → Record your story → AI transcribes → Create audio story narratives → Share with family
     </p>
   </div>
@@ -1109,7 +1109,7 @@ if (currentScreen === 'welcome') {
                 <p style={{ marginBottom: '20px', color: '#666' }}>
   {transcript ? 'How did this memory make you feel?' : 'What emotion does this memory evoke?'}
 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '15px' }}>  {/* ALSO CHANGED THIS LINE */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '15px' }}>  
                   {[
                     { emotion: 'happy', emoji: '😊', label: 'Happy' },
                     { emotion: 'sad', emoji: '😢', label: 'Sad' },
@@ -1313,9 +1313,9 @@ if (currentScreen === 'welcome') {
     flexDirection: isMobile ? 'column' : 'row',  // CHANGED THIS LINE
     gap: isMobile ? '15px' : '0'  // ADDED THIS LINE
   }}>
-    <div style={{ textAlign: isMobile ? 'center' : 'left' }}>  {/* CHANGED THIS LINE */}
-      <h3 style={{ margin: '0 0 5px 0', fontSize: isMobile ? '18px' : '20px' }}>🎤 Voice Search</h3>  {/* CHANGED THIS LINE */}
-      <p style={{ margin: 0, fontSize: isMobile ? '12px' : '14px', color: '#666' }}>  {/* CHANGED THIS LINE */}
+    <div style={{ textAlign: isMobile ? 'center' : 'left' }}>  
+      <h3 style={{ margin: '0 0 5px 0', fontSize: isMobile ? '18px' : '20px' }}>🎤 Voice Search</h3>  
+      <p style={{ margin: 0, fontSize: isMobile ? '12px' : '14px', color: '#666' }}>  
         Try saying: "Play grandpa's war story" or "Show happy memories"
       </p>
     </div>
@@ -1372,8 +1372,8 @@ if (currentScreen === 'welcome') {
   
   {voiceSearchResults.length > 0 && (
     <div style={{ marginTop: '20px' }}>
-      <h4 style={{ fontSize: isMobile ? '16px' : '18px' }}>Search Results:</h4>  {/* CHANGED THIS LINE */}
-      <p style={{ fontSize: isMobile ? '14px' : '16px' }}>{voiceSearchResults.length} memories found</p>  {/* CHANGED THIS LINE */}
+      <h4 style={{ fontSize: isMobile ? '16px' : '18px' }}>Search Results:</h4> 
+      <p style={{ fontSize: isMobile ? '14px' : '16px' }}>{voiceSearchResults.length} memories found</p>  
       {voiceSearchResults.map(memory => (
         <div key={memory.id} style={{ 
           padding: isMobile ? '12px' : '15px',  // CHANGED THIS LINE
@@ -1391,16 +1391,16 @@ if (currentScreen === 'welcome') {
             audio.play()
           }
         }}>
-          <span style={{ marginRight: '10px', fontSize: isMobile ? '16px' : '18px' }}>  {/* CHANGED THIS LINE */}
+          <span style={{ marginRight: '10px', fontSize: isMobile ? '16px' : '18px' }}>  
             {memory.emotion === 'happy' && '😊'}
             {memory.emotion === 'sad' && '😢'}
             {memory.emotion === 'grateful' && '🙏'}
             {memory.emotion === 'excited' && '🎉'}
           </span>
-          <span style={{ fontSize: isMobile ? '14px' : '16px' }}>  {/* CHANGED THIS LINE */}
+          <span style={{ fontSize: isMobile ? '14px' : '16px' }}>  
             {memory.transcript.substring(0, 50)}...
           </span>
-          <span style={{ marginLeft: '10px', color: '#2196F3', fontSize: isMobile ? '14px' : '16px' }}>▶️ Play</span>  {/* CHANGED THIS LINE */}
+          <span style={{ marginLeft: '10px', color: '#2196F3', fontSize: isMobile ? '14px' : '16px' }}>▶️ Play</span>  
         </div>
       ))}
     </div>
@@ -1628,7 +1628,7 @@ if (currentScreen === 'welcome') {
       Transform your recordings into shareable audio stories
     </p>
     {memories.length === 0 ? (
-      <div style={{ textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  {/* ALSO CHANGED THIS LINE */}
+      <div style={{ textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  
         <p style={{ color: '#666', marginBottom: '20px' }}>
           You need to record some memories first before creating stories.
         </p>
@@ -1738,7 +1738,7 @@ if (currentScreen === 'welcome') {
 }}>
   <h2 style={{ marginBottom: '20px', color: '#333' }}>Your Generated Stories</h2>
   {stories.length === 0 ? (
-    <p style={{ color: '#666', textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  {/* ALSO CHANGED THIS LINE */}
+    <p style={{ color: '#666', textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  
       No stories created yet. Generate your first story above!
     </p>
   ) : (
@@ -2058,7 +2058,7 @@ if (currentScreen === 'welcome') {
 }}>
   <h2 style={{ marginBottom: '20px', color: '#333' }}>Family Members</h2>
   {familyMembers.length === 0 ? (
-    <p style={{ color: '#666', textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  {/* ALSO CHANGED THIS LINE */}
+    <p style={{ color: '#666', textAlign: 'center', padding: isMobile ? '20px' : '40px' }}>  
       No family members added yet. Invite your first family member above!
     </p>
   ) : (
@@ -2230,11 +2230,11 @@ Pricing Plans
   border: '2px solid #f0f0f0'
 }}>
   <h3 style={{ color: '#4CAF50', marginBottom: '10px' }}>Free</h3>
-  <div style={{ fontSize: isMobile ? '36px' : '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>  {/* CHANGED THIS LINE */}
+  <div style={{ fontSize: isMobile ? '36px' : '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>  
     $0
-    <span style={{ fontSize: isMobile ? '16px' : '18px', color: '#666' }}>/month</span>  {/* CHANGED THIS LINE */}
+    <span style={{ fontSize: isMobile ? '16px' : '18px', color: '#666' }}>/month</span> 
   </div>
-  <p style={{ color: '#666', marginBottom: isMobile ? '20px' : '30px' }}>Perfect for getting started</p>  {/* CHANGED THIS LINE */}
+  <p style={{ color: '#666', marginBottom: isMobile ? '20px' : '30px' }}>Perfect for getting started</p>  
   
   <ul style={{ 
     listStyle: 'none', 
@@ -2273,11 +2273,11 @@ Pricing Plans
   position: 'relative'
 }}>
   <h3 style={{ color: '#9C27B0', marginBottom: '10px' }}>Premium</h3>
-  <div style={{ fontSize: isMobile ? '36px' : '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>  {/* CHANGED THIS LINE */}
+  <div style={{ fontSize: isMobile ? '36px' : '48px', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>  
     $4.99
-    <span style={{ fontSize: isMobile ? '16px' : '18px', color: '#666' }}>/month</span>  {/* CHANGED THIS LINE */}
+    <span style={{ fontSize: isMobile ? '16px' : '18px', color: '#666' }}>/month</span> 
   </div>
-  <p style={{ color: '#666', marginBottom: isMobile ? '20px' : '30px' }}>For active families</p>  {/* CHANGED THIS LINE */}
+  <p style={{ color: '#666', marginBottom: isMobile ? '20px' : '30px' }}>For active families</p>  
   
   <ul style={{ 
     listStyle: 'none', 
