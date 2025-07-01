@@ -1548,59 +1548,59 @@ const generateAudioNarration = async (text, apiKey) => {
 
         
       {/* ADD NAVIGATION BAR HERE - THIS IS THE NEW CODE */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: '20px', 
-        marginBottom: '20px' 
-      }}>
-        <button
-          onClick={() => setCurrentScreen('memories')}
-          style={{
-            padding: '10px 20px',
-            background: 'white',
-            color: '#667eea',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}
-        >
-          🎙️ Memories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('stories')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          📖 Stories
-        </button>
-        <button
-          onClick={() => setCurrentScreen('family')}
-          style={{
-            padding: '10px 20px',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'normal'
-          }}
-        >
-          👨‍👩‍👧‍👦 Family
-        </button>
-      </div>
-      {/* END OF NEW NAVIGATION BAR CODE */}
+<div style={{ 
+  display: 'flex', 
+  justifyContent: 'center', 
+  gap: '20px', 
+  marginBottom: '20px' 
+}}>
+  <button
+    onClick={() => setCurrentScreen('memories')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',  // Keep transparent
+      color: 'white',                       // Keep white
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'                  // Keep normal
+    }}
+  >
+    🎙️ Memories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('stories')}
+    style={{
+      padding: '10px 20px',
+      background: 'white',                  // Change to white (highlighted)
+      color: '#667eea',                     // Change to purple
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold'                    // Change to bold
+    }}
+  >
+    📖 Stories
+  </button>
+  <button
+    onClick={() => setCurrentScreen('family')}
+    style={{
+      padding: '10px 20px',
+      background: 'rgba(255,255,255,0.2)',  // Keep transparent
+      color: 'white',                       // Keep white
+      border: 'none',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'normal'                  // Keep normal
+    }}
+  >
+    👨‍👩‍👧‍👦 Family
+  </button>
+</div>
+{/* END OF NEW NAVIGATION BAR CODE */}
 
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           {/* Story Generation */}
