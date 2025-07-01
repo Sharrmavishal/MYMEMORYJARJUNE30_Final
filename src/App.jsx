@@ -1042,13 +1042,13 @@ const generateAudioNarration = async (text, apiKey) => {
     onClick={() => setCurrentScreen('memories')}
     style={{
       padding: '10px 20px',
-      background: 'rgba(255,255,255,0.2)',
-      color: 'white',
+      background: 'white',  // CHANGE THIS
+      color: '#667eea',     // CHANGE THIS
       border: 'none',
       borderRadius: '20px',
       cursor: 'pointer',
       fontSize: '14px',
-      fontWeight: 'normal'
+      fontWeight: 'bold'    // CHANGE THIS
     }}
   >
     🎙️ Memories
@@ -1057,13 +1057,13 @@ const generateAudioNarration = async (text, apiKey) => {
     onClick={() => setCurrentScreen('stories')}
     style={{
       padding: '10px 20px',
-      background: 'white',
-      color: '#667eea',
+      background: 'rgba(255,255,255,0.2)',  // CHANGE THIS
+      color: 'white',                       // CHANGE THIS
       border: 'none',
       borderRadius: '20px',
       cursor: 'pointer',
       fontSize: '14px',
-      fontWeight: 'bold'
+      fontWeight: 'normal'                  // CHANGE THIS
     }}
   >
     📖 Stories
@@ -1085,7 +1085,6 @@ const generateAudioNarration = async (text, apiKey) => {
   </button>
 </div>
 {/* END OF NEW NAVIGATION BAR CODE */}
-        
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           {/* Recording Interface */}
           <div style={{
